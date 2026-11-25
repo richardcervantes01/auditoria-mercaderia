@@ -17,6 +17,8 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <!-- SheetJS for Excel (.xlsx) Import & Export -->
   <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+  <!-- Chart.js for KPI Dashboards -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 
   <script>
     tailwind.config = {
@@ -75,6 +77,7 @@
       #detail-modal,
       #operario-success-modal,
       #user-edit-modal,
+      #change-pass-modal,
       #saving-overlay {
         display: none !important;
       }
@@ -105,7 +108,7 @@
           <i class="fa-solid fa-clipboard-check text-3xl text-white"></i>
         </div>
         <h1 class="text-xl font-extrabold tracking-tight">Auditoría de Mercadería</h1>
-        <p class="text-xs text-blue-200 mt-1">Control Logístico · Almacén &amp; Transporte</p>
+        <p class="text-xs text-blue-200 mt-1">Control Logístico · Almacén, Transporte &amp; KPIs</p>
         <div class="mt-3 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-corp-950/75 border border-blue-400/20 text-[11px] text-blue-100">
           <span id="login-cloud-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
           <span id="login-cloud-text">Supabase Cloud Listo</span>
@@ -157,10 +160,10 @@
   <!-- ===================================================================== -->
   <!-- 1. SHELL PRINCIPAL DE LA APLICACIÓN MÓVIL                             -->
   <!-- ===================================================================== -->
-  <div id="app-shell" class="hidden min-h-screen flex flex-col max-w-2xl mx-auto bg-slate-100 shadow-2xl relative">
+  <div id="app-shell" class="hidden min-h-screen flex flex-col max-w-3xl mx-auto bg-slate-100 shadow-2xl relative">
 
-    <!-- ENCABEZADO FIJO -->
-    <header class="sticky top-0 z-30 bg-corp-900 text-white px-4 py-3 shadow-md">
+    <!-- ENCABEZADO FIJO CON CAMBIO DE CLAVE PARA TODOS LOS PERFILES -->
+    <header class="sticky top-0 z-30 bg-corp-900 text-white px-3.5 sm:px-4 py-3 shadow-md">
       <div class="flex items-center justify-between gap-2">
         <div class="flex items-center gap-2.5 min-w-0">
           <div class="w-10 h-10 rounded-xl bg-corp-600 flex items-center justify-center shrink-0 shadow-inner">
@@ -169,7 +172,7 @@
           <div class="min-w-0">
             <h1 class="text-sm sm:text-base font-extrabold leading-tight truncate">Auditoría de Mercadería</h1>
             <div class="flex items-center gap-1.5 mt-0.5 flex-wrap">
-              <span id="header-user-name" class="text-[11px] text-blue-100 font-semibold truncate max-w-[140px] sm:max-w-[210px]">Usuario</span>
+              <span id="header-user-name" class="text-[11px] text-blue-100 font-semibold truncate max-w-[125px] sm:max-w-[210px]">Usuario</span>
               <span id="header-role-badge" class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/30 text-indigo-100 border border-indigo-300/30">
                 Perfil
               </span>
@@ -177,13 +180,22 @@
           </div>
         </div>
 
-        <div class="flex items-center gap-2 shrink-0">
-          <span id="cloud-status-badge" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-semibold bg-corp-950/70 text-emerald-200 border border-emerald-400/30">
+        <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          <span id="cloud-status-badge" title="Estado de sincronización" class="inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-[10px] font-semibold bg-corp-950/70 text-emerald-200 border border-emerald-400/30">
             <span id="cloud-status-dot" class="w-2 h-2 rounded-full bg-emerald-400"></span>
-            <span id="cloud-status-text" class="hidden sm:inline">Nube Conectada</span>
+            <span id="cloud-status-text" class="hidden md:inline">Nube OK</span>
           </span>
+
+          <!-- Botón Cambiar Contraseña (Visible para Administrador, Supervisor y Operario) -->
+          <button type="button" onclick="openChangePasswordModal()" title="Cambiar mi contraseña"
+            class="min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/35 border border-blue-300/30 text-blue-100 text-xs font-bold flex items-center gap-1.5 transition">
+            <i class="fa-solid fa-key"></i>
+            <span>Clave</span>
+          </button>
+
+          <!-- Botón Cerrar Sesión -->
           <button type="button" onclick="confirmLogout()" title="Cerrar sesión"
-            class="min-h-[38px] px-3 py-1.5 rounded-xl bg-white/10 hover:bg-red-500/85 text-white text-xs font-bold flex items-center gap-1.5 transition">
+            class="min-h-[38px] px-2.5 sm:px-3 py-1.5 rounded-xl bg-white/10 hover:bg-red-500/85 text-white text-xs font-bold flex items-center gap-1.5 transition">
             <i class="fa-solid fa-right-from-bracket"></i>
             <span class="hidden sm:inline">Salir</span>
           </button>
@@ -240,7 +252,7 @@
             <!-- Tarjeta Resumen Dinámico de Carga -->
             <div class="bg-gradient-to-r from-corp-900 to-corp-700 text-white rounded-2xl p-4 shadow-md flex items-center justify-between">
               <div>
-                <p class="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Resumen de Carga Auditada</p>
+                <p class="text-[11px] uppercase tracking-wider text-blue-200 font-bold">Cantidad Total de Carga</p>
                 <p id="live-total-carga" class="text-lg sm:text-xl font-extrabold mt-0.5">0 unidades · 0 paletas</p>
               </div>
               <div class="w-12 h-12 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
@@ -270,7 +282,7 @@
 
                 <div>
                   <label class="block text-xs font-bold text-slate-600 mb-1">N° de Auditoría *</label>
-                  <input type="text" id="f-numero" required placeholder="Ej. AUD-20261123-001"
+                  <input type="text" id="f-numero" required placeholder="Ej. AUD-2026-001"
                     class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-extrabold text-corp-900 focus:border-corp-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none" />
                 </div>
               </div>
@@ -279,7 +291,7 @@
               <div class="relative">
                 <label class="block text-xs font-bold text-slate-600 mb-1">Sub-Cliente *</label>
                 <div class="relative">
-                  <input type="text" id="f-subcliente" autocomplete="off" placeholder="Buscar entre los 59 Sub-Clientes o escribir..."
+                  <input type="text" id="f-subcliente" autocomplete="off" placeholder="Buscar Sub-Cliente o escribir..."
                     class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 pl-3.5 pr-9 py-2.5 text-sm focus:border-corp-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none" />
                   <i class="fa-solid fa-magnifying-glass text-slate-400 text-xs absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 </div>
@@ -301,10 +313,10 @@
               </div>
             </div>
 
-            <!-- Destino y Horarios -->
+            <!-- Destino y Horarios (Hora Inicio y Hora Fin estructuradas para cálculo exacto de duración) -->
             <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
               <h2 class="text-sm font-extrabold text-corp-900 flex items-center gap-2 border-b border-slate-100 pb-2">
-                <i class="fa-solid fa-map-location-dot text-corp-600"></i> Destino y Horario
+                <i class="fa-solid fa-map-location-dot text-corp-600"></i> Destino y Horario de Auditoría
               </h2>
 
               <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -322,16 +334,29 @@
                 </div>
               </div>
 
-              <div>
-                <div class="flex items-center justify-between mb-1">
-                  <label class="block text-xs font-bold text-slate-600">Hora inicio – fin</label>
-                  <button type="button" onclick="setHoraInicioFinAhora()"
-                    class="min-h-[32px] px-2.5 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-corp-700 text-[11px] font-bold flex items-center gap-1 transition">
-                    <i class="fa-regular fa-clock"></i> Ahora
-                  </button>
+              <div class="grid grid-cols-2 gap-3">
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label for="f-hora-inicio" class="block text-xs font-bold text-slate-600">Hora de Inicio</label>
+                    <button type="button" onclick="setQuickTime('f-hora-inicio')" class="text-[11px] font-bold text-corp-600 hover:underline">Ahora</button>
+                  </div>
+                  <input type="time" id="f-hora-inicio" oninput="updateLiveDurationBadge()"
+                    class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold focus:border-corp-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none" />
                 </div>
-                <input type="text" id="f-hora-inicio-fin" placeholder="Ej. 08:00 - 09:30"
-                  class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-medium focus:border-corp-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none" />
+
+                <div>
+                  <div class="flex items-center justify-between mb-1">
+                    <label for="f-hora-fin" class="block text-xs font-bold text-slate-600">Hora de Fin</label>
+                    <button type="button" onclick="setQuickTime('f-hora-fin')" class="text-[11px] font-bold text-corp-600 hover:underline">Ahora</button>
+                  </div>
+                  <input type="time" id="f-hora-fin" oninput="updateLiveDurationBadge()"
+                    class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold focus:border-corp-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none" />
+                </div>
+              </div>
+
+              <div id="live-duration-box" class="bg-slate-50 border border-slate-200 rounded-xl px-3.5 py-2 flex items-center justify-between text-xs">
+                <span class="text-slate-500 font-semibold"><i class="fa-regular fa-clock text-corp-600 mr-1.5"></i>Tiempo estimado de auditoría:</span>
+                <strong id="live-duration-text" class="text-corp-900 font-extrabold">Pendiente de horario</strong>
               </div>
             </div>
 
@@ -344,7 +369,7 @@
               <div class="relative">
                 <label class="block text-xs font-bold text-slate-600 mb-1">Transportista</label>
                 <div class="relative">
-                  <input type="text" id="f-transportista" autocomplete="off" placeholder="Buscar entre los 18 transportistas o escribir..."
+                  <input type="text" id="f-transportista" autocomplete="off" placeholder="Buscar Transportista o escribir..."
                     class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 pl-3.5 pr-9 py-2.5 text-sm focus:border-corp-600 focus:bg-white focus:ring-2 focus:ring-blue-100 outline-none" />
                   <i class="fa-solid fa-magnifying-glass text-slate-400 text-xs absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"></i>
                 </div>
@@ -385,7 +410,6 @@
           <!-- ============================================================= -->
           <div id="step-carga" class="form-step hidden space-y-4">
 
-            <!-- Barra de Totales Fija / Destacada -->
             <div class="sticky top-[116px] z-10 bg-corp-900 text-white rounded-2xl p-3.5 shadow-lg border border-blue-400/20">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-[11px] font-extrabold uppercase tracking-wider text-blue-200">Totales de Carga Auditada</span>
@@ -411,10 +435,8 @@
               </div>
             </div>
 
-            <!-- Contenedor de Ítems -->
             <div id="items-container" class="space-y-3"></div>
 
-            <!-- Botón + Agregar Ítem -->
             <button type="button" onclick="addCargoItem()"
               class="w-full min-h-[48px] py-3.5 rounded-2xl border-2 border-dashed border-corp-600/60 bg-blue-50/80 hover:bg-blue-100/80 text-corp-700 font-extrabold text-sm flex items-center justify-center gap-2 transition">
               <i class="fa-solid fa-plus-circle text-base"></i> + Agregar Ítem
@@ -537,7 +559,7 @@
             <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex items-start gap-2.5 text-xs text-corp-900">
               <i class="fa-solid fa-cloud-arrow-up text-corp-600 text-base mt-0.5"></i>
               <div>
-                <strong>Evidencia Fotográfica (6 espacios):</strong> Toma fotos directamente con la cámara o sube desde galería. Las imágenes se comprimen (máx. 1200px) y se suben a <strong>Supabase Storage</strong> al guardar.
+                <strong>Evidencia Fotográfica (6 espacios):</strong> Toma fotos directamente con la cámara o sube desde galería. Las imágenes se optimizan automáticamente (máx. 1024px) y se almacenan en <strong>Supabase Storage</strong>.
               </div>
             </div>
 
@@ -554,7 +576,7 @@
           </div>
 
           <!-- ============================================================= -->
-          <!-- SECCIÓN 5: RESPONSABLES Y FIRMAS DIGITALES                    -->
+          <!-- SECCIÓN 5: RESPONSABLES Y FIRMAS DIGITALES TÁCTILES            -->
           <!-- ============================================================= -->
           <div id="step-firmas" class="form-step hidden space-y-3.5">
             <div class="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 flex items-start gap-2.5 text-xs text-corp-900">
@@ -604,11 +626,18 @@
             </button>
           </div>
 
-          <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar" id="hist-filters">
-            <button type="button" data-filter="Todos" onclick="setHistoryFilter('Todos')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-corp-900 text-white">Todos</button>
-            <button type="button" data-filter="Conforme" onclick="setHistoryFilter('Conforme')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">Conforme</button>
-            <button type="button" data-filter="Conforme con observaciones" onclick="setHistoryFilter('Conforme con observaciones')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">Con Obs.</button>
-            <button type="button" data-filter="No conforme" onclick="setHistoryFilter('No conforme')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">No Conforme</button>
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar" id="hist-filters">
+              <button type="button" data-filter="Todos" onclick="setHistoryFilter('Todos')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-corp-900 text-white">Todos</button>
+              <button type="button" data-filter="Conforme" onclick="setHistoryFilter('Conforme')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">Conforme</button>
+              <button type="button" data-filter="Conforme con observaciones" onclick="setHistoryFilter('Conforme con observaciones')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">Con Obs.</button>
+              <button type="button" data-filter="No conforme" onclick="setHistoryFilter('No conforme')" class="hist-filter-btn shrink-0 min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-600">No Conforme</button>
+            </div>
+
+            <button type="button" onclick="exportAllFilteredHistoryExcel()"
+              class="min-h-[36px] px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-file-excel"></i> Exportar Lista
+            </button>
           </div>
         </div>
 
@@ -621,7 +650,275 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- PESTAÑA 3: CATÁLOGO BD & IMPORTADOR EXCEL (ADMIN Y SUPERVISOR)    -->
+      <!-- PESTAÑA 3: INDICADORES / KPIs (ADMIN Y SUPERVISOR)                -->
+      <!-- ================================================================= -->
+      <section id="tab-indicadores" class="tab-view hidden p-4 space-y-4">
+
+        <!-- Cabecera + Acciones de Exportación -->
+        <div class="bg-gradient-to-r from-corp-900 to-corp-800 text-white rounded-2xl p-4 shadow-md space-y-3">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <h2 class="text-base font-extrabold flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-blue-300"></i> Tablero de Indicadores Logísticos
+              </h2>
+              <p class="text-xs text-blue-200 mt-0.5">Análisis operativo, tiempos de auditoría y calidad de despacho.</p>
+            </div>
+            <button type="button" onclick="loadAuditsFromSupabase(true)" title="Actualizar datos"
+              class="min-w-[38px] min-h-[38px] rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition">
+              <i class="fa-solid fa-arrows-rotate text-xs"></i>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <button type="button" onclick="exportKpiReportExcel()"
+              class="min-h-[42px] px-3 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow transition">
+              <i class="fa-solid fa-file-excel"></i> Exportar Reporte KPI (.xlsx)
+            </button>
+            <button type="button" onclick="exportKpiDataCSV()"
+              class="min-h-[42px] px-3 py-2 rounded-xl bg-white/15 hover:bg-white/25 border border-white/20 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition">
+              <i class="fa-solid fa-file-csv"></i> Exportar Base CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Filtros Interactivos -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-extrabold text-corp-900 uppercase tracking-wider">
+              <i class="fa-solid fa-filter text-corp-600 mr-1"></i> Filtros de Análisis
+            </span>
+            <button type="button" onclick="resetKpiFilters()" class="text-xs font-bold text-corp-600 hover:underline">
+              Limpiar filtros
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">Desde</label>
+              <input type="date" id="kpi-date-from" onchange="refreshKpiDashboard()"
+                class="w-full min-h-[40px] rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold outline-none focus:border-corp-600" />
+            </div>
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">Hasta</label>
+              <input type="date" id="kpi-date-to" onchange="refreshKpiDashboard()"
+                class="w-full min-h-[40px] rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold outline-none focus:border-corp-600" />
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">Cliente</label>
+              <select id="kpi-filter-cliente" onchange="onKpiClienteChange()"
+                class="w-full min-h-[40px] rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold outline-none focus:border-corp-600">
+                <option value="">Todos los clientes</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">Sub-Cliente</label>
+              <select id="kpi-filter-subcliente" onchange="refreshKpiDashboard()"
+                class="w-full min-h-[40px] rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold outline-none focus:border-corp-600">
+                <option value="">Todos los sub-clientes</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-500 mb-1">Transportista</label>
+              <select id="kpi-filter-transportista" onchange="refreshKpiDashboard()"
+                class="w-full min-h-[40px] rounded-xl border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold outline-none focus:border-corp-600">
+                <option value="">Todos los transportistas</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tarjetas Scorecards KPI Ejecutivos (6 KPIs clave) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+          <!-- KPI 1: Total Auditorías -->
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-400 mb-1">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Total Auditorías</span>
+              <i class="fa-solid fa-clipboard-list text-corp-600"></i>
+            </div>
+            <div id="kpi-card-total" class="text-2xl font-extrabold text-corp-900">0</div>
+            <div id="kpi-card-avg-day" class="text-[11px] text-slate-500 mt-0.5 font-medium">0.0 aud./día activo</div>
+          </div>
+
+          <!-- KPI 2: Tiempo Promedio Auditoría Diaria -->
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-400 mb-1">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tiempo Promedio</span>
+              <i class="fa-solid fa-stopwatch text-indigo-600"></i>
+            </div>
+            <div id="kpi-card-avg-time" class="text-2xl font-extrabold text-indigo-700">0 min</div>
+            <div id="kpi-card-total-time" class="text-[11px] text-slate-500 mt-0.5 font-medium">Total: 0h 0m</div>
+          </div>
+
+          <!-- KPI 3: Nivel de Conformidad (OTIF / Calidad Despacho) -->
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-400 mb-1">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Conformidad</span>
+              <i class="fa-solid fa-circle-check text-emerald-600"></i>
+            </div>
+            <div id="kpi-card-conformidad" class="text-2xl font-extrabold text-emerald-600">0%</div>
+            <div id="kpi-card-conformidad-sub" class="text-[11px] text-slate-500 mt-0.5 font-medium">0 conformes</div>
+          </div>
+
+          <!-- KPI 4: Exactitud de Picking / IRA % -->
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-400 mb-1">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Exactitud (IRA)</span>
+              <i class="fa-solid fa-bullseye text-sky-600"></i>
+            </div>
+            <div id="kpi-card-ira" class="text-2xl font-extrabold text-sky-700">100%</div>
+            <div id="kpi-card-units-sub" class="text-[11px] text-slate-500 mt-0.5 font-medium">0 unid · 0 paletas</div>
+          </div>
+
+          <!-- KPI 5: Integridad de Precintos -->
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-400 mb-1">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Precinto Intacto</span>
+              <i class="fa-solid fa-lock text-teal-600"></i>
+            </div>
+            <div id="kpi-card-precinto" class="text-2xl font-extrabold text-teal-700">0%</div>
+            <div id="kpi-card-precinto-sub" class="text-[11px] text-slate-500 mt-0.5 font-medium">0 violados</div>
+          </div>
+
+          <!-- KPI 6: Tasa de Incidencias en Cantidad -->
+          <div class="bg-white rounded-2xl p-3.5 shadow-sm border border-slate-200/80">
+            <div class="flex items-center justify-between text-slate-400 mb-1">
+              <span class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Tasa Incidencias</span>
+              <i class="fa-solid fa-triangle-exclamation text-amber-500"></i>
+            </div>
+            <div id="kpi-card-incidencias" class="text-2xl font-extrabold text-amber-600">0%</div>
+            <div id="kpi-card-incidencias-sub" class="text-[11px] text-slate-500 mt-0.5 font-medium">Dif. neta: 0 unid</div>
+          </div>
+        </div>
+
+        <!-- Gráfico 1: Evolución Temporal (Por Día / Por Hora / Por Mes / Por Año) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between gap-2 flex-wrap">
+            <h3 class="text-sm font-extrabold text-corp-900 flex items-center gap-2">
+              <i class="fa-solid fa-calendar-days text-corp-600"></i> Auditorías y Tiempo por Periodo
+            </h3>
+            <div class="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <button type="button" data-tmode="dia" onclick="setKpiTimeMode('dia')" class="kpi-tmode-btn px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-corp-900 text-white transition">Día</button>
+              <button type="button" data-tmode="hora" onclick="setKpiTimeMode('hora')" class="kpi-tmode-btn px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-slate-600 transition">Hora</button>
+              <button type="button" data-tmode="mes" onclick="setKpiTimeMode('mes')" class="kpi-tmode-btn px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-slate-600 transition">Mes</button>
+              <button type="button" data-tmode="anio" onclick="setKpiTimeMode('anio')" class="kpi-tmode-btn px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-slate-600 transition">Año</button>
+            </div>
+          </div>
+
+          <div class="relative h-56 w-full">
+            <canvas id="chart-temporal"></canvas>
+          </div>
+
+          <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-52">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-slate-100 text-slate-600 text-[10px] uppercase sticky top-0">
+                <tr>
+                  <th class="p-2" id="kpi-time-col-header">Fecha (Día)</th>
+                  <th class="p-2 text-right">Auditorías</th>
+                  <th class="p-2 text-right">Unidades</th>
+                  <th class="p-2 text-right">Paletas</th>
+                  <th class="p-2 text-right">Tiempo Prom.</th>
+                </tr>
+              </thead>
+              <tbody id="kpi-time-table-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Gráfico 2: Distribución de Resultado & Tiempo Diario -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-2">
+            <h3 class="text-xs font-extrabold text-corp-900 uppercase tracking-wider">
+              <i class="fa-solid fa-chart-pie text-emerald-600 mr-1"></i> Resultado de Auditorías
+            </h3>
+            <div class="relative h-48 w-full">
+              <canvas id="chart-resultados"></canvas>
+            </div>
+          </div>
+
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-2">
+            <h3 class="text-xs font-extrabold text-corp-900 uppercase tracking-wider">
+              <i class="fa-solid fa-building text-corp-600 mr-1"></i> Auditorías por Cliente
+            </h3>
+            <div class="relative h-48 w-full">
+              <canvas id="chart-clientes"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- Desglose Jerárquico: Cliente y Sub-Cliente -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-extrabold text-corp-900 flex items-center gap-2">
+              <i class="fa-solid fa-sitemap text-corp-600"></i> Desglose por Cliente y Sub-Cliente
+            </h3>
+            <span id="kpi-subcli-count" class="text-[11px] font-bold text-slate-400">0 grupos</span>
+          </div>
+
+          <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-72">
+            <table class="w-full text-left text-xs">
+              <thead class="bg-corp-900 text-white text-[10px] uppercase sticky top-0">
+                <tr>
+                  <th class="p-2">Cliente / Sub-Cliente</th>
+                  <th class="p-2 text-right">Aud.</th>
+                  <th class="p-2 text-right">Unid.</th>
+                  <th class="p-2 text-right">Conf.</th>
+                  <th class="p-2 text-right">T. Prom</th>
+                </tr>
+              </thead>
+              <tbody id="kpi-cliente-sub-body" class="divide-y divide-slate-100"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Ranking de Transportistas y Top SKUs con Incidencias -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+          <!-- Desempeño por Transportista -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-2.5">
+            <h3 class="text-xs font-extrabold text-corp-900 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-truck-fast text-corp-600"></i> Desempeño Transportistas
+            </h3>
+            <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-60">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 text-[10px] uppercase sticky top-0">
+                  <tr>
+                    <th class="p-2">Transportista</th>
+                    <th class="p-2 text-right">Aud.</th>
+                    <th class="p-2 text-right">Conf.%</th>
+                  </tr>
+                </thead>
+                <tbody id="kpi-transp-body" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Top SKUs con Diferencias -->
+          <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-2.5">
+            <h3 class="text-xs font-extrabold text-corp-900 uppercase tracking-wider flex items-center gap-1.5">
+              <i class="fa-solid fa-box-open text-amber-600"></i> SKUs con Mayor Desviación
+            </h3>
+            <div class="overflow-x-auto border border-slate-200 rounded-xl max-h-60">
+              <table class="w-full text-left text-xs">
+                <thead class="bg-slate-100 text-slate-600 text-[10px] uppercase sticky top-0">
+                  <tr>
+                    <th class="p-2">SKU / Producto</th>
+                    <th class="p-2 text-right">Dif. Abs</th>
+                  </tr>
+                </thead>
+                <tbody id="kpi-skus-body" class="divide-y divide-slate-100"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+      </section>
+
+      <!-- ================================================================= -->
+      <!-- PESTAÑA 4: CATÁLOGO BD (SINCRONIZADO CON SUPABASE: catalogo_bd)   -->
       <!-- ================================================================= -->
       <section id="tab-catalogo" class="tab-view hidden p-4 space-y-4">
         <div class="bg-gradient-to-br from-corp-900 to-corp-950 text-white rounded-2xl p-4 shadow-md space-y-3">
@@ -630,19 +927,25 @@
               <i class="fa-solid fa-file-excel text-xl"></i>
             </div>
             <div class="flex-1 min-w-0">
-              <h2 class="text-sm font-extrabold">Importar Hoja BD desde Excel (.xlsx)</h2>
+              <h2 class="text-sm font-extrabold">Catálogo Maestro BD en Supabase</h2>
               <p class="text-xs text-blue-200 mt-0.5 leading-relaxed">
-                Carga el Excel maestro para importar los 1,135+ SKUs (SKU, 12NC, Descripción), Sub-clientes, Transportistas y Destinos en el almacenamiento local del dispositivo para autocompletado instantáneo.
+                Importa la hoja <strong>BD</strong> desde Excel (.xlsx) para sincronizar automáticamente los SKUs, Clientes, Sub-clientes, Transportistas y Destinos con <strong>todos los celulares</strong> a través de Supabase.
               </p>
             </div>
           </div>
 
-          <label class="block w-full cursor-pointer">
-            <input type="file" id="excel-upload-input" accept=".xlsx,.xls" class="hidden" onchange="handleExcelImport(event)" />
-            <div class="w-full min-h-[46px] py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs sm:text-sm text-center shadow flex items-center justify-center gap-2 transition">
-              <i class="fa-solid fa-upload"></i> Seleccionar archivo Excel (.xlsx)
-            </div>
-          </label>
+          <div class="flex items-center gap-2">
+            <label class="flex-1 cursor-pointer">
+              <input type="file" id="excel-upload-input" accept=".xlsx,.xls" class="hidden" onchange="handleExcelImport(event)" />
+              <div class="w-full min-h-[46px] py-3 px-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs sm:text-sm text-center shadow flex items-center justify-center gap-2 transition">
+                <i class="fa-solid fa-upload"></i> Importar Excel (.xlsx) a la Nube
+              </div>
+            </label>
+            <button type="button" onclick="loadCatalogFromSupabase(true)" title="Descargar catálogo desde Supabase"
+              class="min-w-[46px] min-h-[46px] rounded-xl bg-white/15 hover:bg-white/25 text-white flex items-center justify-center transition">
+              <i id="cat-sync-icon" class="fa-solid fa-cloud-arrow-down"></i>
+            </button>
+          </div>
           <div id="excel-import-status" class="hidden text-xs bg-white/10 rounded-xl p-2.5 text-blue-100"></div>
         </div>
 
@@ -674,7 +977,7 @@
             </div>
             <div class="flex justify-end gap-2">
               <button type="button" onclick="toggleAddCatalogForm(false)" class="min-h-[36px] px-3 py-1.5 rounded-lg text-xs font-bold text-slate-600">Cancelar</button>
-              <button type="button" onclick="saveNewCatalogItem()" class="min-h-[36px] px-4 py-1.5 rounded-lg bg-corp-600 text-white text-xs font-bold">Guardar</button>
+              <button type="button" onclick="saveNewCatalogItem()" class="min-h-[36px] px-4 py-1.5 rounded-lg bg-corp-600 text-white text-xs font-bold">Guardar en Nube</button>
             </div>
           </div>
 
@@ -689,7 +992,7 @@
       </section>
 
       <!-- ================================================================= -->
-      <!-- PESTAÑA 4: GESTIÓN DE USUARIOS (SOLO ADMINISTRADOR - SUPABASE)    -->
+      <!-- PESTAÑA 5: GESTIÓN DE USUARIOS (SOLO ADMINISTRADOR - SUPABASE)    -->
       <!-- ================================================================= -->
       <section id="tab-usuarios" class="tab-view hidden p-4 space-y-4">
         <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-3.5">
@@ -710,7 +1013,7 @@
                 <label class="block text-xs font-bold text-slate-600 mb-1">Rol / Perfil *</label>
                 <select id="u-new-rol" class="w-full min-h-[44px] rounded-xl border border-slate-300 bg-slate-50 px-3.5 py-2.5 text-sm font-semibold focus:border-corp-600 focus:bg-white outline-none">
                   <option value="Operario">Operario (Solo registrar)</option>
-                  <option value="Supervisor">Supervisor (Historial y BD)</option>
+                  <option value="Supervisor">Supervisor (Historial, KPIs y BD)</option>
                   <option value="Administrador">Administrador (Acceso total)</option>
                 </select>
               </div>
@@ -763,37 +1066,104 @@
     </main>
 
     <!-- =================================================================== -->
-    <!-- BARRA DE NAVEGACIÓN INFERIOR (DINÁMICA POR ROL)                     -->
+    <!-- BARRA DE NAVEGACIÓN INFERIOR (DINÁMICA POR ROL - HASTA 5 TABS)      -->
     <!-- =================================================================== -->
-    <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 z-30 max-w-2xl mx-auto bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,41,74,0.08)]">
-      <div id="bottom-nav-grid" class="grid grid-cols-4 h-16">
+    <nav id="bottom-nav" class="fixed bottom-0 left-0 right-0 z-30 max-w-3xl mx-auto bg-white border-t border-slate-200 shadow-[0_-4px_20px_rgba(15,41,74,0.08)]">
+      <div id="bottom-nav-grid" class="grid grid-cols-5 h-16">
         <button type="button" data-tab="nueva" onclick="switchMainTab('nueva')" class="nav-btn min-h-[48px] flex flex-col items-center justify-center gap-1 text-corp-600 font-extrabold relative">
-          <i class="fa-solid fa-file-circle-plus text-lg"></i>
-          <span class="text-[11px]">Auditoría</span>
+          <i class="fa-solid fa-file-circle-plus text-base sm:text-lg"></i>
+          <span class="text-[10px] sm:text-[11px]">Auditoría</span>
           <span id="nav-edit-dot" class="hidden absolute top-2 right-1/4 w-2 h-2 rounded-full bg-amber-500"></span>
         </button>
 
         <button type="button" data-tab="historial" onclick="switchMainTab('historial')" class="nav-btn min-h-[48px] flex flex-col items-center justify-center gap-1 text-slate-400 font-semibold relative">
           <div class="relative">
-            <i class="fa-solid fa-clock-rotate-left text-lg"></i>
-            <span id="nav-hist-count" class="hidden absolute -top-1.5 -right-3 min-w-[18px] h-[18px] px-1 rounded-full bg-corp-600 text-white text-[10px] font-bold flex items-center justify-center">0</span>
+            <i class="fa-solid fa-clock-rotate-left text-base sm:text-lg"></i>
+            <span id="nav-hist-count" class="hidden absolute -top-1.5 -right-3 min-w-[17px] h-[17px] px-1 rounded-full bg-corp-600 text-white text-[9px] font-bold flex items-center justify-center">0</span>
           </div>
-          <span class="text-[11px]">Historial</span>
+          <span class="text-[10px] sm:text-[11px]">Historial</span>
+        </button>
+
+        <button type="button" data-tab="indicadores" onclick="switchMainTab('indicadores')" class="nav-btn min-h-[48px] flex flex-col items-center justify-center gap-1 text-slate-400 font-semibold">
+          <i class="fa-solid fa-chart-column text-base sm:text-lg"></i>
+          <span class="text-[10px] sm:text-[11px]">KPIs</span>
         </button>
 
         <button type="button" data-tab="catalogo" onclick="switchMainTab('catalogo')" class="nav-btn min-h-[48px] flex flex-col items-center justify-center gap-1 text-slate-400 font-semibold">
-          <i class="fa-solid fa-database text-lg"></i>
-          <span class="text-[11px]">Catálogo BD</span>
+          <i class="fa-solid fa-database text-base sm:text-lg"></i>
+          <span class="text-[10px] sm:text-[11px]">Catálogo</span>
         </button>
 
         <button type="button" data-tab="usuarios" onclick="switchMainTab('usuarios')" class="nav-btn min-h-[48px] flex flex-col items-center justify-center gap-1 text-slate-400 font-semibold">
-          <i class="fa-solid fa-users-gear text-lg"></i>
-          <span class="text-[11px]">Usuarios</span>
+          <i class="fa-solid fa-users-gear text-base sm:text-lg"></i>
+          <span class="text-[10px] sm:text-[11px]">Usuarios</span>
         </button>
       </div>
     </nav>
 
   </div><!-- /#app-shell -->
+
+  <!-- ===================================================================== -->
+  <!-- MODAL CAMBIAR CONTRASEÑA PROPIA (TODOS LOS PERFILES)                  -->
+  <!-- ===================================================================== -->
+  <div id="change-pass-modal" class="hidden fixed inset-0 z-[65] bg-slate-900/65 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+      <div class="bg-corp-900 text-white px-5 py-4 flex items-center justify-between">
+        <div>
+          <h3 class="font-extrabold text-sm flex items-center gap-2"><i class="fa-solid fa-key text-blue-300"></i> Cambiar mi Contraseña</h3>
+          <p id="cp-user-label" class="text-[11px] text-blue-200 mt-0.5">Usuario activo</p>
+        </div>
+        <button type="button" onclick="closeChangePasswordModal()" class="w-8 h-8 rounded-lg text-white/75 hover:text-white flex items-center justify-center">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <form class="p-5 space-y-3.5" onsubmit="event.preventDefault(); submitChangePassword();">
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Contraseña Actual *</label>
+          <div class="relative">
+            <input type="password" id="cp-current" required placeholder="Ingresa tu clave actual"
+              class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-slate-50 pl-3.5 pr-10 py-2 text-sm focus:border-corp-600 focus:bg-white outline-none" />
+            <button type="button" onclick="togglePasswordVisibility('cp-current', 'cp-eye-1')"
+              class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 text-slate-400 hover:text-corp-900 flex items-center justify-center">
+              <i id="cp-eye-1" class="fa-solid fa-eye text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Nueva Contraseña *</label>
+          <div class="relative">
+            <input type="password" id="cp-new" required minlength="4" placeholder="Mínimo 4 caracteres"
+              class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-slate-50 pl-3.5 pr-10 py-2 text-sm focus:border-corp-600 focus:bg-white outline-none" />
+            <button type="button" onclick="togglePasswordVisibility('cp-new', 'cp-eye-2')"
+              class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 text-slate-400 hover:text-corp-900 flex items-center justify-center">
+              <i id="cp-eye-2" class="fa-solid fa-eye text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-600 mb-1">Confirmar Nueva Contraseña *</label>
+          <div class="relative">
+            <input type="password" id="cp-confirm" required minlength="4" placeholder="Repite la nueva clave"
+              class="w-full min-h-[42px] rounded-xl border border-slate-300 bg-slate-50 pl-3.5 pr-10 py-2 text-sm focus:border-corp-600 focus:bg-white outline-none" />
+            <button type="button" onclick="togglePasswordVisibility('cp-confirm', 'cp-eye-3')"
+              class="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 text-slate-400 hover:text-corp-900 flex items-center justify-center">
+              <i id="cp-eye-3" class="fa-solid fa-eye text-xs"></i>
+            </button>
+          </div>
+        </div>
+
+        <div id="cp-error" class="hidden rounded-xl bg-red-50 border border-red-200 px-3 py-2 text-xs font-semibold text-red-700"></div>
+
+        <div class="flex justify-end gap-2 pt-1">
+          <button type="button" onclick="closeChangePasswordModal()" class="min-h-[42px] px-4 py-2 rounded-xl bg-slate-100 text-slate-700 text-xs font-bold">Cancelar</button>
+          <button type="submit" id="btn-cp-save" class="min-h-[42px] px-5 py-2 rounded-xl bg-corp-600 hover:bg-corp-700 text-white text-xs font-extrabold shadow">Actualizar Clave</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <!-- ===================================================================== -->
   <!-- OVERLAY DE PROGRESO AL GUARDAR Y SUBIR FOTOS A SUPABASE               -->
@@ -967,10 +1337,10 @@
     const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
     // =========================================================================
-    // 2. CATÁLOGOS BD PRECARGADOS (SIGNIFY PERU / COSMOS PUNTA HERMOSA)
+    // 2. CATÁLOGOS BD PRECARGADOS (RESPALDO INICIAL Y SINCRONIZACIÓN NUBE)
     // =========================================================================
-    const CATALOG_STORAGE_KEY = "auditoria_mercaderia_catalogo_bd_v1";
-    const SESSION_USER_KEY = "auditoria_mercaderia_active_user_v1";
+    const CATALOG_STORAGE_KEY = "auditoria_mercaderia_catalogo_bd_v2";
+    const SESSION_USER_KEY = "auditoria_mercaderia_active_user_v2";
 
     const DEFAULT_CLIENTES = [
       "Signify Peru",
@@ -997,7 +1367,6 @@
       "Surquillo"
     ];
 
-    // 59 Sub-Clientes del formato maestro BD
     const DEFAULT_SUBCLIENTES = [
       "HOMECENTERS PERUANOS S.A.",
       "SODIMAC PERU S.A.",
@@ -1021,46 +1390,9 @@
       "ELECTRO SUR ESTE S.A.",
       "HIDRANDINA S.A.",
       "ELECTROCENTRO S.A.",
-      "ELECTRONORTE S.A.",
-      "ELECTRO ORIENTE S.A.",
-      "ELECTRO PUNO S.A.A.",
-      "ELECTRO UCAYALI S.A.",
-      "SOCIEDAD ELECTRICA DEL SUR OESTE S.A.",
-      "LUZ DEL SUR S.A.A.",
-      "PLUZ ENERGIA PERU S.A.A.",
-      "CONSORCIO ELECTRICO DE VILLACURI S.A.C.",
-      "ELECTRO DUNAS S.A.A.",
-      "ADINELSA",
-      "INGENIERIA Y CONSTRUCCION DEL PERU S.A.C.",
-      "GRUPO DELTRON S.A.",
-      "INGRAM MICRO S.A.C.",
-      "INTCOMEX PERU S.A.C.",
-      "MAXIMA INTERNACIONAL S.A.",
-      "CORPORACION MARA S.A.",
-      "DISTRIBUIDORA FERRETERA SAN JUAN S.A.C.",
-      "FERRETERIA Y REPRESENTACIONES S.A.C.",
-      "INVERSIONES ELECTRICAS DEL SUR S.A.C.",
-      "LUMICENTER PERU S.A.C.",
-      "ILUMINACION PROFESIONAL S.A.C.",
-      "PROYECTOS DE ILUMINACION Y ENERGIA S.A.C.",
-      "SOLUCIONES ELECTRICAS INTEGRALES S.A.C.",
-      "COMERCIALIZADORA ELECTRICA LIMA S.A.C.",
-      "REPRESENTACIONES INDUSTRIALES DEL PERU S.A.",
-      "SUMINISTROS INDUSTRIALES Y MINEROS S.A.C.",
-      "COMPANIA MINERA ANTAMINA S.A.",
-      "SOCIEDAD MINERA CERRO VERDE S.A.A.",
-      "SOUTHERN PERU COPPER CORPORATION",
-      "MINERA LAS BAMBAS S.A.",
-      "COMPANIA DE MINAS BUENAVENTURA S.A.A.",
-      "VOLCAN COMPANIA MINERA S.A.A.",
-      "NEXA RESOURCES PERU S.A.A.",
-      "MINSUR S.A.",
-      "CORPORACION ACEROS AREQUIPA S.A.",
-      "SIDERPERU S.A.A.",
-      "UNACEM PERU S.A."
+      "ELECTRONORTE S.A."
     ];
 
-    // 18 Transportistas del formato maestro BD
     const DEFAULT_TRANSPORTISTAS = [
       "TOTAL CARGO PERU E.I.R.L.",
       "GRUPO PANAMUNDO S.A.C.",
@@ -1073,16 +1405,9 @@
       "CORPORACION 23 S.A.C",
       "SERATRANS",
       "TRANSPORTE MATIAS",
-      "TRANSPORTES LD ROJAS EIRL",
-      "TRANSPORTE Y LOGISTICA DEL SUR S.A.C.",
-      "EXPRESO NACIONAL LOGISTICO S.A.C.",
-      "CARGO EXPRESS PERU S.A.C.",
-      "TRANSPORTES GENERALES SANTA ROSA S.A.C.",
-      "OPERADOR LOGISTICO INTEGRAL S.A.C.",
-      "TRANSPORTE RAPIDO DEL PACIFICO E.I.R.L."
+      "TRANSPORTES LD ROJAS EIRL"
     ];
 
-    // Muestra representativa de SKUs del catálogo BD (ampliable al instante con el importador .xlsx)
     const DEFAULT_SKUS = [
       { sku: "910403219703", nc12: "910403219703", descripcion: "RC530Z EP WH SET ( 2PCS)" },
       { sku: "910500465902", nc12: "910500465902", descripcion: "DN145B LED10S/840 PSD-E II WH" },
@@ -1133,9 +1458,8 @@
         transportistas: [...DEFAULT_TRANSPORTISTAS],
         destinos: [...DEFAULT_DESTINOS]
       },
-      editingAuditId: null, // UUID de Supabase cuando se edita
+      editingAuditId: null,
       items: [],
-      // Cada foto guarda: { num: 1..6, url: 'https://...' (ya en Storage), previewUrl: 'data:...' o 'https://...', blob: Blob|null, descripcion: '' }
       photos: Array.from({ length: 6 }, (_, i) => ({
         num: i + 1,
         url: "",
@@ -1143,7 +1467,6 @@
         blob: null,
         descripcion: ""
       })),
-      // Objeto firmas con llaves { auditor, conductor, cliente, supervisor }
       firmas: {
         auditor: { nombre: "", dni: "", cargo: "", fecha: "", firmaDataUrl: "" },
         conductor: { nombre: "", dni: "", cargo: "", fecha: "", firmaDataUrl: "" },
@@ -1151,21 +1474,25 @@
         supervisor: { nombre: "", dni: "", cargo: "", fecha: "", firmaDataUrl: "" }
       },
       historyFilter: "Todos",
-      catalogTab: "skus"
+      catalogTab: "skus",
+      kpiTimeMode: "dia", // 'dia' | 'hora' | 'mes' | 'anio'
+      kpiComputedCache: null
+    };
+
+    const chartInstances = {
+      temporal: null,
+      resultados: null,
+      clientes: null
     };
 
     // =========================================================================
-    // 4. UTILIDADES GENERALES
+    // 4. UTILIDADES GENERALES Y CÁLCULO DE TIEMPOS
     // =========================================================================
     function getTodayISO() {
       const now = new Date();
       const offset = now.getTimezoneOffset();
       const local = new Date(now.getTime() - offset * 60 * 1000);
       return local.toISOString().split("T")[0];
-    }
-
-    function getCompactDateStr() {
-      return getTodayISO().replace(/-/g, "");
     }
 
     function getCurrentHHMM() {
@@ -1181,6 +1508,40 @@
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#039;");
+    }
+
+    // Parsea "HH:MM - HH:MM" y devuelve { startHour, durationMinutes }
+    function parseAuditTimeRange(rangeStr) {
+      if (!rangeStr || typeof rangeStr !== "string") {
+        return { startHour: null, durationMinutes: null };
+      }
+      const matches = rangeStr.match(/(\d{1,2}):(\d{2})/g);
+      if (!matches || matches.length === 0) {
+        return { startHour: null, durationMinutes: null };
+      }
+      const [h1, m1] = matches[0].split(":").map(Number);
+      const startHour = !isNaN(h1) && h1 >= 0 && h1 <= 23 ? h1 : null;
+
+      if (matches.length >= 2) {
+        const [h2, m2] = matches[1].split(":").map(Number);
+        if (!isNaN(h1) && !isNaN(m1) && !isNaN(h2) && !isNaN(m2)) {
+          let diff = (h2 * 60 + m2) - (h1 * 60 + m1);
+          if (diff < 0) diff += 24 * 60; // Cruce de medianoche
+          if (diff >= 0 && diff <= 1440) {
+            return { startHour, durationMinutes: diff };
+          }
+        }
+      }
+      return { startHour, durationMinutes: null };
+    }
+
+    function formatMinutesHuman(mins) {
+      if (mins === null || mins === undefined || isNaN(mins) || mins <= 0) return "0 min";
+      const rounded = Math.round(mins);
+      if (rounded < 60) return `${rounded} min`;
+      const h = Math.floor(rounded / 60);
+      const m = rounded % 60;
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
     }
 
     window.togglePasswordVisibility = function (inputId, iconId) {
@@ -1240,14 +1601,14 @@
       const loginDot = document.getElementById("login-cloud-dot");
       const loginText = document.getElementById("login-cloud-text");
       if (dot) dot.className = online ? "w-2 h-2 rounded-full bg-emerald-400" : "w-2 h-2 rounded-full bg-amber-400";
-      if (text) text.textContent = customText || (online ? "Nube Conectada" : "Sin conexión");
+      if (text) text.textContent = customText || (online ? "Nube OK" : "Sin red");
       if (loginDot) loginDot.className = online ? "w-2 h-2 rounded-full bg-emerald-400" : "w-2 h-2 rounded-full bg-amber-400";
       if (loginText) loginText.textContent = customText || (online ? "Supabase Cloud Listo" : "Modo respaldo local");
     }
 
     function suggestAuditNumber() {
-      const dateTag = getCompactDateStr();
-      const prefix = `AUD-${dateTag}-`;
+      const year = new Date().getFullYear();
+      const prefix = `AUD-${year}-`;
       let maxNum = 0;
       state.audits.forEach(a => {
         const numStr = a.numero_auditoria || "";
@@ -1260,7 +1621,7 @@
     }
 
     // =========================================================================
-    // 5. PERSISTENCIA LOCAL DEL CATÁLOGO BD (localStorage)
+    // 5. SINCRONIZACIÓN DE CATÁLOGO BD CON SUPABASE (`catalogo_bd` id=1)
     // =========================================================================
     function loadCatalogFromLocalStorage() {
       try {
@@ -1282,16 +1643,98 @@
         localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(state.catalog));
       } catch (e) {
         console.warn("Error guardando catálogo en localStorage:", e);
-        showToast("El catálogo excede la memoria local del navegador.", "warning");
+      }
+    }
+
+    window.loadCatalogFromSupabase = async function (notify = false) {
+      const icon = document.getElementById("cat-sync-icon");
+      if (icon) icon.classList.add("fa-spin");
+
+      try {
+        const { data, error } = await sb
+          .from("catalogo_bd")
+          .select("*")
+          .eq("id", 1)
+          .maybeSingle();
+
+        if (error) throw error;
+
+        if (data) {
+          let updatedAny = false;
+          if (Array.isArray(data.skus) && data.skus.length > 0) {
+            state.catalog.skus = data.skus;
+            updatedAny = true;
+          }
+          if (Array.isArray(data.clientes) && data.clientes.length > 0) {
+            state.catalog.clientes = data.clientes;
+            updatedAny = true;
+          }
+          if (Array.isArray(data.subclientes) && data.subclientes.length > 0) {
+            state.catalog.subclientes = data.subclientes;
+            updatedAny = true;
+          }
+          if (Array.isArray(data.transportistas) && data.transportistas.length > 0) {
+            state.catalog.transportistas = data.transportistas;
+            updatedAny = true;
+          }
+          if (Array.isArray(data.destinos) && data.destinos.length > 0) {
+            state.catalog.destinos = data.destinos;
+            updatedAny = true;
+          }
+
+          if (updatedAny) {
+            saveCatalogToLocalStorage();
+            populateClienteSelect();
+            populateDestinoSelect();
+            renderCatalogList();
+          }
+        }
+
+        if (notify) {
+          showToast(`Catálogo BD sincronizado (${state.catalog.skus.length} SKUs).`, "success");
+        }
+      } catch (err) {
+        console.warn("Catálogo BD usando caché local:", err.message);
+        if (notify) {
+          showToast("No se pudo sincronizar Catálogo BD: " + err.message, "warning");
+        }
+      } finally {
+        if (icon) icon.classList.remove("fa-spin");
+      }
+    };
+
+    async function saveCatalogToSupabase() {
+      saveCatalogToLocalStorage();
+      try {
+        const payload = {
+          id: 1,
+          skus: state.catalog.skus,
+          clientes: state.catalog.clientes,
+          subclientes: state.catalog.subclientes,
+          transportistas: state.catalog.transportistas,
+          destinos: state.catalog.destinos,
+          actualizado_en: new Date().toISOString()
+        };
+
+        const { error } = await sb
+          .from("catalogo_bd")
+          .upsert(payload, { onConflict: "id" });
+
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error("Error sincronizando catalogo_bd en Supabase:", err);
+        showToast("Guardado local OK, pero falló subida a Supabase: " + err.message, "warning");
+        return false;
       }
     }
 
     // =========================================================================
-    // 6. AUTENTICACIÓN CONTRA SUPABASE (`usuarios_auditoria`) Y RBAC
+    // 6. AUTENTICACIÓN, CAMBIO DE CONTRASEÑA Y CONTROL DE ROLES (RBAC)
     // =========================================================================
     function getAllowedTabsForRole(rol) {
-      if (rol === "Administrador") return ["nueva", "historial", "catalogo", "usuarios"];
-      if (rol === "Supervisor") return ["nueva", "historial", "catalogo"];
+      if (rol === "Administrador") return ["nueva", "historial", "indicadores", "catalogo", "usuarios"];
+      if (rol === "Supervisor") return ["nueva", "historial", "indicadores", "catalogo"];
       return ["nueva"]; // Operario
     }
 
@@ -1332,9 +1775,8 @@
           .maybeSingle();
 
         if (error) {
-          console.warn("Error consultando usuarios_auditoria en Supabase:", error.message);
+          console.warn("Error consultando usuarios_auditoria:", error.message);
           if (idInput === "admin" && passInput === "1111") {
-            console.warn("Usando respaldo local de emergencia para admin.");
             authenticatedUser = { id: "admin", nombre: "Administrador Principal", rol: "Administrador" };
             setCloudStatus(false, "Respaldo local");
           } else {
@@ -1348,8 +1790,6 @@
           };
           setCloudStatus(true);
         } else if (idInput === "admin" && passInput === "1111") {
-          // Respaldo si la tabla estuviera vacía inicialmente
-          console.warn("Usuario admin no encontrado en tabla; activando respaldo local.");
           authenticatedUser = { id: "admin", nombre: "Administrador Principal", rol: "Administrador" };
         }
       } catch (err) {
@@ -1376,9 +1816,7 @@
       state.activeUser = userObj;
       try {
         sessionStorage.setItem(SESSION_USER_KEY, JSON.stringify(userObj));
-      } catch (e) {
-        console.warn("No se pudo guardar sesión en sessionStorage:", e);
-      }
+      } catch (e) {}
 
       applyUserSessionUI();
       document.getElementById("login-screen").classList.add("hidden");
@@ -1387,6 +1825,9 @@
 
       resetFormNew();
       switchMainTab("nueva");
+
+      // Sincronizar Catálogo BD desde Supabase para todos los roles
+      loadCatalogFromSupabase(false);
 
       if (userObj.rol === "Administrador" || userObj.rol === "Supervisor") {
         loadAuditsFromSupabase(false);
@@ -1419,6 +1860,99 @@
 
       navGrid.className = `grid h-16 grid-cols-${allowed.length}`;
     }
+
+    // Modal Cambiar Contraseña Propia (Todos los perfiles)
+    window.openChangePasswordModal = function () {
+      if (!state.activeUser) return;
+      document.getElementById("cp-user-label").textContent = `${state.activeUser.nombre} · ID: ${state.activeUser.id}`;
+      document.getElementById("cp-current").value = "";
+      document.getElementById("cp-new").value = "";
+      document.getElementById("cp-confirm").value = "";
+      document.getElementById("cp-error").classList.add("hidden");
+      document.getElementById("change-pass-modal").classList.remove("hidden");
+      setTimeout(() => document.getElementById("cp-current").focus(), 100);
+    };
+
+    window.closeChangePasswordModal = function () {
+      document.getElementById("change-pass-modal").classList.add("hidden");
+    };
+
+    window.submitChangePassword = async function () {
+      if (!state.activeUser) return;
+      const currentPass = document.getElementById("cp-current").value;
+      const newPass = document.getElementById("cp-new").value;
+      const confirmPass = document.getElementById("cp-confirm").value;
+      const errBox = document.getElementById("cp-error");
+      const btn = document.getElementById("btn-cp-save");
+
+      errBox.classList.add("hidden");
+
+      if (newPass.length < 4) {
+        errBox.textContent = "La nueva contraseña debe tener al menos 4 caracteres.";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      if (newPass !== confirmPass) {
+        errBox.textContent = "La confirmación no coincide con la nueva contraseña.";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      if (newPass === currentPass) {
+        errBox.textContent = "La nueva contraseña debe ser diferente a la actual.";
+        errBox.classList.remove("hidden");
+        return;
+      }
+
+      btn.disabled = true;
+      btn.textContent = "Actualizando...";
+
+      try {
+        // 1. Verificar contraseña actual contra usuarios_auditoria
+        const { data: userRow, error: checkErr } = await sb
+          .from("usuarios_auditoria")
+          .select("id, password")
+          .eq("id", state.activeUser.id)
+          .maybeSingle();
+
+        if (checkErr) throw checkErr;
+
+        if (!userRow) {
+          throw new Error("El usuario no existe en Supabase. Verifica la tabla usuarios_auditoria.");
+        }
+
+        if (String(userRow.password) !== String(currentPass)) {
+          errBox.textContent = "La contraseña actual ingresada es incorrecta.";
+          errBox.classList.remove("hidden");
+          btn.disabled = false;
+          btn.textContent = "Actualizar Clave";
+          return;
+        }
+
+        // 2. Actualizar contraseña en Supabase
+        const { error: updErr } = await sb
+          .from("usuarios_auditoria")
+          .update({ password: newPass })
+          .eq("id", state.activeUser.id);
+
+        if (updErr) throw updErr;
+
+        closeChangePasswordModal();
+        showToast("¡Contraseña actualizada correctamente en Supabase!", "success");
+
+        if (state.activeUser.rol === "Administrador") {
+          loadUsersFromSupabase();
+        }
+      } catch (err) {
+        console.error("Error cambiando contraseña:", err);
+        errBox.textContent = err.message || "No se pudo actualizar la contraseña.";
+        errBox.classList.remove("hidden");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Actualizar Clave";
+      }
+    };
 
     window.confirmLogout = function () {
       openConfirmModal(
@@ -1462,6 +1996,17 @@
       });
 
       if (tabName === "historial") loadAuditsFromSupabase(false);
+      if (tabName === "indicadores") {
+        if (state.audits.length === 0) {
+          loadAuditsFromSupabase(false).then(() => {
+            populateKpiFilters();
+            refreshKpiDashboard();
+          });
+        } else {
+          populateKpiFilters();
+          refreshKpiDashboard();
+        }
+      }
       if (tabName === "catalogo") renderCatalogList();
       if (tabName === "usuarios") loadUsersFromSupabase();
       window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1482,7 +2027,7 @@
     };
 
     // =========================================================================
-    // 8. SECCIÓN 1: SELECTS, HORARIO Y AUTOCOMPLETADOS
+    // 8. SECCIÓN 1: SELECTS, HORARIO ESTRUCTURADO Y AUTOCOMPLETADOS
     // =========================================================================
     function populateClienteSelect() {
       const sel = document.getElementById("f-cliente");
@@ -1518,20 +2063,31 @@
       if (currentVal) sel.value = currentVal;
     }
 
-    window.setHoraInicioFinAhora = function () {
-      const input = document.getElementById("f-hora-inicio-fin");
-      const nowStr = getCurrentHHMM();
-      const val = input.value.trim();
-      if (!val) {
-        input.value = `${nowStr} - `;
-      } else if (val.endsWith("-")) {
-        input.value = `${val} ${nowStr}`;
-      } else if (val.includes("-") && val.split("-")[1].trim() === "") {
-        input.value = `${val.split("-")[0].trim()} - ${nowStr}`;
-      } else {
-        input.value = `${nowStr} - `;
+    window.setQuickTime = function (inputId) {
+      const input = document.getElementById(inputId);
+      if (!input) return;
+      input.value = getCurrentHHMM();
+      updateLiveDurationBadge();
+    };
+
+    window.updateLiveDurationBadge = function () {
+      const hIni = document.getElementById("f-hora-inicio").value;
+      const hFin = document.getElementById("f-hora-fin").value;
+      const label = document.getElementById("live-duration-text");
+      if (!label) return;
+
+      if (hIni && hFin) {
+        const parsed = parseAuditTimeRange(`${hIni} - ${hFin}`);
+        if (parsed.durationMinutes !== null) {
+          label.textContent = `${formatMinutesHuman(parsed.durationMinutes)} (${hIni} a ${hFin})`;
+          return;
+        }
       }
-      input.focus();
+      if (hIni) {
+        label.textContent = `Iniciada a las ${hIni}`;
+      } else {
+        label.textContent = "Pendiente de horario";
+      }
     };
 
     function setupAutocomplete(inputId, dropdownId, getListFn) {
@@ -1712,7 +2268,6 @@
       state.items[idx].sku = val;
       const clean = val.trim();
       if (!clean) return;
-      // Coincidencia exacta con SKU en BD -> autocompleta automáticamente
       const exact = state.catalog.skus.find(s => s.sku.toLowerCase() === clean.toLowerCase());
       if (exact) {
         state.items[idx].nc12 = exact.nc12 || "";
@@ -1830,7 +2385,7 @@
     }
 
     // =========================================================================
-    // 10. SECCIÓN 4: EVIDENCIA FOTOGRÁFICA (COMPRESIÓN CANVAS + SUPABASE STORAGE)
+    // 10. SECCIÓN 4: EVIDENCIA FOTOGRÁFICA (COMPRESIÓN + SUPABASE STORAGE)
     // =========================================================================
     function renderPhotosGrid() {
       const grid = document.getElementById("photos-grid");
@@ -1920,8 +2475,7 @@
       reader.onload = (e) => {
         const img = new Image();
         img.onload = () => {
-          // Comprimir imagen a máximo 1200px de ancho y calidad JPEG 0.78
-          const MAX_W = 1200;
+          const MAX_W = 1024;
           let w = img.width;
           let h = img.height;
           if (w > MAX_W) {
@@ -1942,12 +2496,11 @@
               return;
             }
             state.photos[idx].blob = blob;
-            state.photos[idx].previewUrl = canvas.toDataURL("image/jpeg", 0.78);
-            // Al reemplazar por una nueva captura, limpiamos la URL anterior para que suba la nueva
+            state.photos[idx].previewUrl = canvas.toDataURL("image/jpeg", 0.72);
             state.photos[idx].url = "";
             renderPhotosGrid();
             showToast(`Foto ${idx + 1} lista (${Math.round(blob.size / 1024)} KB).`, "success");
-          }, "image/jpeg", 0.78);
+          }, "image/jpeg", 0.72);
         };
         img.src = e.target.result;
       };
@@ -2206,10 +2759,8 @@
       progressText.textContent = "Preparando evidencias fotográficas...";
 
       try {
-        // 1. Subir fotos nuevas a Supabase Storage (`evidencias`) y obtener URLs públicas
         const fotosJson = await uploadPendingPhotosToStorage(numeroAuditoria);
 
-        // 2. Preparar arreglo de ítems limpio
         const cleanedItems = state.items.map((it, i) => ({
           n: i + 1,
           sku: (it.sku || "").trim(),
@@ -2227,6 +2778,10 @@
         const estadoPrecinto = document.querySelector('input[name="estadoPrecinto"]:checked')?.value || "Intacto";
         const clienteVal = getSelectedClienteValue();
 
+        const hIni = document.getElementById("f-hora-inicio").value.trim();
+        const hFin = document.getElementById("f-hora-fin").value.trim();
+        const horaInicioFin = hIni && hFin ? `${hIni} - ${hFin}` : (hIni || hFin || "");
+
         const rowPayload = {
           numero_auditoria: numeroAuditoria,
           cliente: clienteVal,
@@ -2234,7 +2789,7 @@
           delivery: document.getElementById("f-delivery").value.trim(),
           fecha_auditoria: fechaAuditoria || getTodayISO(),
           destino: document.getElementById("f-destino").value,
-          hora_inicio_fin: document.getElementById("f-hora-inicio-fin").value.trim(),
+          hora_inicio_fin: horaInicioFin,
           transportista: document.getElementById("f-transportista").value.trim(),
           placa: document.getElementById("f-placa").value.trim().toUpperCase(),
           conductor: document.getElementById("f-conductor").value.trim(),
@@ -2319,7 +2874,10 @@
       document.getElementById("f-delivery").value = "";
       document.getElementById("f-fecha").value = getTodayISO();
       document.getElementById("f-destino").value = "";
-      document.getElementById("f-hora-inicio-fin").value = "";
+      document.getElementById("f-hora-inicio").value = getCurrentHHMM();
+      document.getElementById("f-hora-fin").value = "";
+      updateLiveDurationBadge();
+
       document.getElementById("f-transportista").value = "";
       document.getElementById("f-placa").value = "";
       document.getElementById("f-conductor").value = "";
@@ -2399,7 +2957,12 @@
       document.getElementById("f-delivery").value = audit.delivery || "";
       document.getElementById("f-fecha").value = audit.fecha_auditoria || getTodayISO();
       document.getElementById("f-destino").value = audit.destino || "";
-      document.getElementById("f-hora-inicio-fin").value = audit.hora_inicio_fin || "";
+
+      const times = (audit.hora_inicio_fin || "").match(/(\d{1,2}:\d{2})/g) || [];
+      document.getElementById("f-hora-inicio").value = times[0] ? times[0].padStart(5, "0") : "";
+      document.getElementById("f-hora-fin").value = times[1] ? times[1].padStart(5, "0") : "";
+      updateLiveDurationBadge();
+
       document.getElementById("f-transportista").value = audit.transportista || "";
       document.getElementById("f-placa").value = audit.placa || "";
       document.getElementById("f-conductor").value = audit.conductor || "";
@@ -2489,6 +3052,7 @@
         const { data, error } = await sb
           .from("auditorias")
           .select("*")
+          .order("fecha_auditoria", { ascending: false })
           .order("creado_en", { ascending: false });
 
         if (error) throw error;
@@ -2512,11 +3076,15 @@
         }
 
         renderHistory();
-        if (notify) showToast("Historial actualizado desde Supabase.", "success");
+        if (!document.getElementById("tab-indicadores").classList.contains("hidden")) {
+          populateKpiFilters();
+          refreshKpiDashboard();
+        }
+        if (notify) showToast(`Datos sincronizados (${state.audits.length} auditorías).`, "success");
       } catch (err) {
         console.error("Error cargando auditorías:", err);
-        setCloudStatus(false, "Error de red");
-        showToast("Error al cargar historial: " + err.message, "error");
+        setCloudStatus(false, "Error red");
+        showToast("Error al cargar datos: " + err.message, "error");
       } finally {
         if (icon) icon.classList.remove("fa-spin");
       }
@@ -2533,6 +3101,20 @@
       renderHistory();
     };
 
+    function getFilteredHistoryList() {
+      const q = (document.getElementById("hist-search")?.value || "").trim().toLowerCase();
+      return state.audits.filter(a => {
+        if (state.historyFilter !== "Todos" && a.resultado !== state.historyFilter) return false;
+        if (!q) return true;
+        return (a.numero_auditoria || "").toLowerCase().includes(q) ||
+          (a.delivery || "").toLowerCase().includes(q) ||
+          (a.sub_cliente || "").toLowerCase().includes(q) ||
+          (a.placa || "").toLowerCase().includes(q) ||
+          (a.cliente || "").toLowerCase().includes(q) ||
+          (a.creado_por || "").toLowerCase().includes(q);
+      });
+    }
+
     function getResultBadge(resultado) {
       if (resultado === "Conforme") {
         return `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-700">Conforme</span>`;
@@ -2545,18 +3127,7 @@
 
     window.renderHistory = function () {
       const listEl = document.getElementById("history-list");
-      const q = (document.getElementById("hist-search")?.value || "").trim().toLowerCase();
-
-      const filtered = state.audits.filter(a => {
-        if (state.historyFilter !== "Todos" && a.resultado !== state.historyFilter) return false;
-        if (!q) return true;
-        return (a.numero_auditoria || "").toLowerCase().includes(q) ||
-          (a.delivery || "").toLowerCase().includes(q) ||
-          (a.sub_cliente || "").toLowerCase().includes(q) ||
-          (a.placa || "").toLowerCase().includes(q) ||
-          (a.cliente || "").toLowerCase().includes(q) ||
-          (a.creado_por || "").toLowerCase().includes(q);
-      });
+      const filtered = getFilteredHistoryList();
 
       if (filtered.length === 0) {
         listEl.innerHTML = `
@@ -2575,14 +3146,16 @@
         const photoCount = Array.isArray(a.fotos) ? a.fotos.filter(f => f.url).length : 0;
         const unidades = a.total_unidades ?? computeTotals(a.items || []).verificada;
         const paletas = a.total_paletas ?? computeTotals(a.items || []).paletas;
+        const tInfo = parseAuditTimeRange(a.hora_inicio_fin);
 
         return `
           <div onclick="openDetailModal('${a.id}')" class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/90 hover:border-corp-600/60 cursor-pointer transition space-y-2.5">
             <div class="flex items-start justify-between gap-2">
               <div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
                   <span class="text-sm font-extrabold text-corp-900">${escapeHtml(a.numero_auditoria || "Sin N°")}</span>
                   <span class="text-[11px] text-slate-400 font-semibold">${escapeHtml(a.fecha_auditoria || "")}</span>
+                  ${tInfo.durationMinutes !== null ? `<span class="text-[10px] font-bold bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full"><i class="fa-regular fa-clock mr-0.5"></i>${formatMinutesHuman(tInfo.durationMinutes)}</span>` : ""}
                 </div>
                 <div class="text-xs font-bold text-slate-700 mt-0.5">${escapeHtml(a.sub_cliente || a.cliente || "—")}</div>
               </div>
@@ -2607,6 +3180,15 @@
       }).join("");
     };
 
+    window.exportAllFilteredHistoryExcel = function () {
+      const list = getFilteredHistoryList();
+      if (list.length === 0) {
+        showToast("No hay registros filtrados para exportar.", "warning");
+        return;
+      }
+      exportAuditsCollectionExcel(list, `Historial_Auditorias_${getTodayISO()}.xlsx`);
+    };
+
     window.openDetailModal = function (auditId) {
       const audit = state.audits.find(a => String(a.id) === String(auditId));
       if (!audit) return;
@@ -2615,6 +3197,7 @@
       const tot = computeTotals(itemsArr);
       const unidades = audit.total_unidades ?? tot.verificada;
       const paletas = audit.total_paletas ?? tot.paletas;
+      const tInfo = parseAuditTimeRange(audit.hora_inicio_fin);
 
       document.getElementById("detail-title").textContent = `${audit.numero_auditoria || "Auditoría"} · ${audit.cliente || ""}`;
       document.getElementById("detail-subtitle").textContent = `${audit.sub_cliente || "Sin sub-cliente"} | ${audit.fecha_auditoria || ""}`;
@@ -2683,7 +3266,7 @@
         <div class="grid grid-cols-2 gap-2.5 text-xs bg-white border border-slate-200 rounded-xl p-3">
           <div><span class="text-slate-400 block text-[10px]">Delivery</span><strong>${escapeHtml(audit.delivery || "—")}</strong></div>
           <div><span class="text-slate-400 block text-[10px]">Destino</span><strong>${escapeHtml(audit.destino || "—")}</strong></div>
-          <div><span class="text-slate-400 block text-[10px]">Horario</span><strong>${escapeHtml(audit.hora_inicio_fin || "—")}</strong></div>
+          <div><span class="text-slate-400 block text-[10px]">Horario</span><strong>${escapeHtml(audit.hora_inicio_fin || "—")} ${tInfo.durationMinutes !== null ? `(${formatMinutesHuman(tInfo.durationMinutes)})` : ""}</strong></div>
           <div><span class="text-slate-400 block text-[10px]">Lugar</span><strong>${escapeHtml(audit.lugar_auditoria || "—")}</strong></div>
           <div class="col-span-2"><span class="text-slate-400 block text-[10px]">Transportista</span><strong>${escapeHtml(audit.transportista || "—")}</strong></div>
           <div><span class="text-slate-400 block text-[10px]">Placa</span><strong>${escapeHtml(audit.placa || "—")}</strong></div>
@@ -2767,7 +3350,6 @@
       const firmasObj = audit.firmas || {};
       const wb = XLSX.utils.book_new();
 
-      // Hoja 1: Formato Auditoría
       const formatoRows = [
         ["FORMATO DE AUDITORÍA DE MERCADERÍA TRANSPORTADA"],
         [],
@@ -2802,7 +3384,6 @@
       wsFormato["!cols"] = [{ wch: 24 }, { wch: 32 }, { wch: 24 }, { wch: 36 }, { wch: 16 }, { wch: 18 }];
       XLSX.utils.book_append_sheet(wb, wsFormato, "Formato Auditoría");
 
-      // Hoja 2: Detalle Ítems
       const itemsSheetRows = [
         ["N°", "SKU", "12NC", "Descripción", "Cant. Declarada", "Cant. Verificada", "Diferencia", "Paletas", "Observación"],
         ...itemsArr.map((it, i) => [
@@ -2969,7 +3550,709 @@
     }
 
     // =========================================================================
-    // 14. PESTAÑA 3: CATÁLOGO BD & IMPORTADOR EXCEL (.XLSX)
+    // 14. PESTAÑA 3: INDICADORES / KPIs (CÁLCULO, GRÁFICOS Y EXPORTACIÓN)
+    // =========================================================================
+    function populateKpiFilters() {
+      const cliSel = document.getElementById("kpi-filter-cliente");
+      const subSel = document.getElementById("kpi-filter-subcliente");
+      const trSel = document.getElementById("kpi-filter-transportista");
+      if (!cliSel || !subSel || !trSel) return;
+
+      const prevCli = cliSel.value;
+      const prevSub = subSel.value;
+      const prevTr = trSel.value;
+
+      const clientes = Array.from(new Set(state.audits.map(a => a.cliente).filter(Boolean))).sort();
+      cliSel.innerHTML = `<option value="">Todos los clientes</option>` +
+        clientes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
+      if (clientes.includes(prevCli)) cliSel.value = prevCli;
+
+      const filteredForSub = prevCli
+        ? state.audits.filter(a => a.cliente === prevCli)
+        : state.audits;
+      const subclientes = Array.from(new Set(filteredForSub.map(a => a.sub_cliente).filter(Boolean))).sort();
+      subSel.innerHTML = `<option value="">Todos los sub-clientes</option>` +
+        subclientes.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      if (subclientes.includes(prevSub)) subSel.value = prevSub;
+
+      const transportistas = Array.from(new Set(state.audits.map(a => a.transportista).filter(Boolean))).sort();
+      trSel.innerHTML = `<option value="">Todos los transportistas</option>` +
+        transportistas.map(t => `<option value="${escapeHtml(t)}">${escapeHtml(t)}</option>`).join("");
+      if (transportistas.includes(prevTr)) trSel.value = prevTr;
+    }
+
+    window.onKpiClienteChange = function () {
+      const cliVal = document.getElementById("kpi-filter-cliente").value;
+      const subSel = document.getElementById("kpi-filter-subcliente");
+      const prevSub = subSel.value;
+
+      const base = cliVal ? state.audits.filter(a => a.cliente === cliVal) : state.audits;
+      const subs = Array.from(new Set(base.map(a => a.sub_cliente).filter(Boolean))).sort();
+      subSel.innerHTML = `<option value="">Todos los sub-clientes</option>` +
+        subs.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+      if (subs.includes(prevSub)) subSel.value = prevSub;
+
+      refreshKpiDashboard();
+    };
+
+    window.resetKpiFilters = function () {
+      document.getElementById("kpi-date-from").value = "";
+      document.getElementById("kpi-date-to").value = "";
+      document.getElementById("kpi-filter-cliente").value = "";
+      populateKpiFilters();
+      document.getElementById("kpi-filter-subcliente").value = "";
+      document.getElementById("kpi-filter-transportista").value = "";
+      refreshKpiDashboard();
+    };
+
+    window.setKpiTimeMode = function (mode) {
+      state.kpiTimeMode = mode;
+      document.querySelectorAll(".kpi-tmode-btn").forEach(btn => {
+        const active = btn.dataset.tmode === mode;
+        btn.className = active
+          ? "kpi-tmode-btn px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-corp-900 text-white transition"
+          : "kpi-tmode-btn px-2.5 py-1 rounded-lg text-[11px] font-extrabold text-slate-600 transition";
+      });
+      refreshKpiDashboard();
+    };
+
+    function getFilteredKpiAudits() {
+      const dFrom = document.getElementById("kpi-date-from")?.value || "";
+      const dTo = document.getElementById("kpi-date-to")?.value || "";
+      const cli = document.getElementById("kpi-filter-cliente")?.value || "";
+      const sub = document.getElementById("kpi-filter-subcliente")?.value || "";
+      const transp = document.getElementById("kpi-filter-transportista")?.value || "";
+
+      return state.audits.filter(a => {
+        const f = a.fecha_auditoria || "";
+        if (dFrom && f && f < dFrom) return false;
+        if (dTo && f && f > dTo) return false;
+        if (cli && a.cliente !== cli) return false;
+        if (sub && a.sub_cliente !== sub) return false;
+        if (transp && a.transportista !== transp) return false;
+        return true;
+      });
+    }
+
+    function computeKpiMetrics(audits) {
+      const total = audits.length;
+      let conformes = 0;
+      let conObs = 0;
+      let noConformes = 0;
+
+      let totalDecl = 0;
+      let totalVerif = 0;
+      let totalAbsDiff = 0;
+      let totalPaletas = 0;
+      let auditsConDiferencia = 0;
+
+      let precintoIntacto = 0;
+      let precintoViolado = 0;
+      let precintoEvaluados = 0;
+
+      let durationSum = 0;
+      let durationCount = 0;
+
+      const byDayMap = new Map();
+      const byHourArr = Array.from({ length: 24 }, (_, h) => ({
+        key: `${String(h).padStart(2, "0")}:00`,
+        audits: 0,
+        unidades: 0,
+        paletas: 0,
+        durSum: 0,
+        durCnt: 0
+      }));
+      const byMonthMap = new Map();
+      const byYearMap = new Map();
+      const byClienteMap = new Map();
+      const byClienteSubMap = new Map();
+      const byTranspMap = new Map();
+      const bySkuMap = new Map();
+
+      audits.forEach(a => {
+        const res = a.resultado || "Conforme";
+        if (res === "Conforme") conformes++;
+        else if (res === "No conforme") noConformes++;
+        else conObs++;
+
+        if (a.estado_precinto === "Intacto") {
+          precintoIntacto++;
+          precintoEvaluados++;
+        } else if (a.estado_precinto === "Violado") {
+          precintoViolado++;
+          precintoEvaluados++;
+        }
+
+        const itemsArr = Array.isArray(a.items) ? a.items : [];
+        const t = computeTotals(itemsArr);
+        const verif = a.total_unidades ?? t.verificada;
+        const decl = t.declarada > 0 ? t.declarada : verif;
+        const pal = a.total_paletas ?? t.paletas;
+
+        totalDecl += decl;
+        totalVerif += verif;
+        totalPaletas += pal;
+
+        let auditHasDiff = false;
+        itemsArr.forEach(it => {
+          const d = parseFloat(it.diferencia) || ((parseFloat(it.verificada) || 0) - (parseFloat(it.declarada) || 0));
+          const absD = Math.abs(d);
+          totalAbsDiff += absD;
+          if (absD > 0) {
+            auditHasDiff = true;
+            const skuKey = it.sku || "SIN-SKU";
+            const curSku = bySkuMap.get(skuKey) || { sku: skuKey, desc: it.descripcion || it.desc || "", absDiff: 0, netDiff: 0, count: 0 };
+            curSku.absDiff += absD;
+            curSku.netDiff += d;
+            curSku.count += 1;
+            bySkuMap.set(skuKey, curSku);
+          }
+        });
+        if (auditHasDiff) auditsConDiferencia++;
+
+        const tInfo = parseAuditTimeRange(a.hora_inicio_fin);
+        if (tInfo.durationMinutes !== null) {
+          durationSum += tInfo.durationMinutes;
+          durationCount++;
+        }
+
+        // Agrupación Día, Mes, Año
+        const fecha = a.fecha_auditoria || "Sin fecha";
+        const monthKey = fecha.length >= 7 ? fecha.slice(0, 7) : "Sin fecha";
+        const yearKey = fecha.length >= 4 ? fecha.slice(0, 4) : "Sin fecha";
+
+        [
+          [byDayMap, fecha],
+          [byMonthMap, monthKey],
+          [byYearMap, yearKey]
+        ].forEach(([mapRef, k]) => {
+          const entry = mapRef.get(k) || { key: k, audits: 0, unidades: 0, paletas: 0, durSum: 0, durCnt: 0 };
+          entry.audits += 1;
+          entry.unidades += verif;
+          entry.paletas += pal;
+          if (tInfo.durationMinutes !== null) {
+            entry.durSum += tInfo.durationMinutes;
+            entry.durCnt += 1;
+          }
+          mapRef.set(k, entry);
+        });
+
+        // Agrupación Hora del día
+        if (tInfo.startHour !== null) {
+          const hEntry = byHourArr[tInfo.startHour];
+          hEntry.audits += 1;
+          hEntry.unidades += verif;
+          hEntry.paletas += pal;
+          if (tInfo.durationMinutes !== null) {
+            hEntry.durSum += tInfo.durationMinutes;
+            hEntry.durCnt += 1;
+          }
+        }
+
+        // Agrupación Cliente
+        const cli = a.cliente || "Sin Cliente";
+        const cEntry = byClienteMap.get(cli) || { cliente: cli, audits: 0, unidades: 0, paletas: 0, conformes: 0 };
+        cEntry.audits += 1;
+        cEntry.unidades += verif;
+        cEntry.paletas += pal;
+        if (res === "Conforme") cEntry.conformes += 1;
+        byClienteMap.set(cli, cEntry);
+
+        // Agrupación Jerárquica Cliente + Sub-Cliente
+        const sub = a.sub_cliente || "Sin Sub-Cliente";
+        const csKey = `${cli}|||${sub}`;
+        const csEntry = byClienteSubMap.get(csKey) || {
+          cliente: cli,
+          subcliente: sub,
+          audits: 0,
+          unidades: 0,
+          paletas: 0,
+          conformes: 0,
+          durSum: 0,
+          durCnt: 0
+        };
+        csEntry.audits += 1;
+        csEntry.unidades += verif;
+        csEntry.paletas += pal;
+        if (res === "Conforme") csEntry.conformes += 1;
+        if (tInfo.durationMinutes !== null) {
+          csEntry.durSum += tInfo.durationMinutes;
+          csEntry.durCnt += 1;
+        }
+        byClienteSubMap.set(csKey, csEntry);
+
+        // Agrupación Transportista
+        const tr = a.transportista || "Sin Transportista";
+        const trEntry = byTranspMap.get(tr) || { transportista: tr, audits: 0, unidades: 0, conformes: 0, violados: 0 };
+        trEntry.audits += 1;
+        trEntry.unidades += verif;
+        if (res === "Conforme") trEntry.conformes += 1;
+        if (a.estado_precinto === "Violado") trEntry.violados += 1;
+        byTranspMap.set(tr, trEntry);
+      });
+
+      const activeDays = Array.from(byDayMap.keys()).filter(k => k !== "Sin fecha").length || 1;
+      const avgAuditsPerDay = total > 0 ? (total / activeDays) : 0;
+      const avgDurationMins = durationCount > 0 ? (durationSum / durationCount) : 0;
+      const conformidadPct = total > 0 ? ((conformes / total) * 100) : 0;
+      const iraPct = totalDecl > 0 ? Math.max(0, ((totalDecl - totalAbsDiff) / totalDecl) * 100) : 100;
+      const precintoPct = precintoEvaluados > 0 ? ((precintoIntacto / precintoEvaluados) * 100) : 100;
+      const incidenciaPct = total > 0 ? ((auditsConDiferencia / total) * 100) : 0;
+
+      const byDay = Array.from(byDayMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+      const byMonth = Array.from(byMonthMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+      const byYear = Array.from(byYearMap.values()).sort((a, b) => a.key.localeCompare(b.key));
+      const byCliente = Array.from(byClienteMap.values()).sort((a, b) => b.audits - a.audits);
+      const byClienteSub = Array.from(byClienteSubMap.values()).sort((a, b) => {
+        if (a.cliente !== b.cliente) return a.cliente.localeCompare(b.cliente);
+        return b.audits - a.audits;
+      });
+      const byTransp = Array.from(byTranspMap.values()).sort((a, b) => b.audits - a.audits);
+      const topSkus = Array.from(bySkuMap.values()).sort((a, b) => b.absDiff - a.absDiff);
+
+      return {
+        filteredAudits: audits,
+        total,
+        conformes,
+        conObs,
+        noConformes,
+        totalDecl,
+        totalVerif,
+        totalAbsDiff,
+        totalPaletas,
+        auditsConDiferencia,
+        precintoIntacto,
+        precintoViolado,
+        durationSum,
+        durationCount,
+        avgAuditsPerDay,
+        avgDurationMins,
+        conformidadPct,
+        iraPct,
+        precintoPct,
+        incidenciaPct,
+        byDay,
+        byHour: byHourArr,
+        byMonth,
+        byYear,
+        byCliente,
+        byClienteSub,
+        byTransp,
+        topSkus
+      };
+    }
+
+    window.refreshKpiDashboard = function () {
+      const filtered = getFilteredKpiAudits();
+      const kpi = computeKpiMetrics(filtered);
+      state.kpiComputedCache = kpi;
+
+      // 1. Actualizar Tarjetas Ejecutivas
+      document.getElementById("kpi-card-total").textContent = kpi.total;
+      document.getElementById("kpi-card-avg-day").textContent = `${kpi.avgAuditsPerDay.toFixed(1)} aud./día activo`;
+
+      document.getElementById("kpi-card-avg-time").textContent = kpi.durationCount > 0
+        ? formatMinutesHuman(kpi.avgDurationMins)
+        : "S/D";
+      document.getElementById("kpi-card-total-time").textContent = `Total: ${formatMinutesHuman(kpi.durationSum)} (${kpi.durationCount} reg.)`;
+
+      document.getElementById("kpi-card-conformidad").textContent = `${kpi.conformidadPct.toFixed(1)}%`;
+      document.getElementById("kpi-card-conformidad-sub").textContent = `${kpi.conformes} de ${kpi.total} conformes`;
+
+      document.getElementById("kpi-card-ira").textContent = `${kpi.iraPct.toFixed(1)}%`;
+      document.getElementById("kpi-card-units-sub").textContent = `${kpi.totalVerif} unid · ${kpi.totalPaletas} paletas`;
+
+      document.getElementById("kpi-card-precinto").textContent = `${kpi.precintoPct.toFixed(1)}%`;
+      document.getElementById("kpi-card-precinto-sub").textContent = `${kpi.precintoViolado} violados`;
+
+      document.getElementById("kpi-card-incidencias").textContent = `${kpi.incidenciaPct.toFixed(1)}%`;
+      document.getElementById("kpi-card-incidencias-sub").textContent = `Desviación: ${kpi.totalAbsDiff} unid`;
+
+      // 2. Tabla y Gráfico Temporal (Día / Hora / Mes / Año)
+      let series = kpi.byDay;
+      let colHeader = "Fecha (Día)";
+      if (state.kpiTimeMode === "hora") {
+        series = kpi.byHour;
+        colHeader = "Franja Horaria";
+      } else if (state.kpiTimeMode === "mes") {
+        series = kpi.byMonth;
+        colHeader = "Mes (AAAA-MM)";
+      } else if (state.kpiTimeMode === "anio") {
+        series = kpi.byYear;
+        colHeader = "Año";
+      }
+
+      document.getElementById("kpi-time-col-header").textContent = colHeader;
+      const timeBody = document.getElementById("kpi-time-table-body");
+      const visibleRows = state.kpiTimeMode === "hora"
+        ? series.filter(r => r.audits > 0)
+        : [...series].reverse();
+
+      if (visibleRows.length === 0) {
+        timeBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Sin datos para el filtro seleccionado.</td></tr>`;
+      } else {
+        timeBody.innerHTML = visibleRows.map(r => {
+          const avgT = r.durCnt > 0 ? formatMinutesHuman(r.durSum / r.durCnt) : "—";
+          return `
+            <tr>
+              <td class="p-2 font-bold text-corp-900">${escapeHtml(r.key)}</td>
+              <td class="p-2 text-right font-extrabold">${r.audits}</td>
+              <td class="p-2 text-right">${r.unidades}</td>
+              <td class="p-2 text-right">${r.paletas}</td>
+              <td class="p-2 text-right text-indigo-700 font-semibold">${avgT}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      renderKpiCharts(kpi, series);
+
+      // 3. Tabla Jerárquica Cliente y Sub-Cliente
+      document.getElementById("kpi-subcli-count").textContent = `${kpi.byClienteSub.length} grupos`;
+      const csBody = document.getElementById("kpi-cliente-sub-body");
+      if (kpi.byClienteSub.length === 0) {
+        csBody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-slate-400">Sin registros en este rango.</td></tr>`;
+      } else {
+        csBody.innerHTML = kpi.byClienteSub.map(row => {
+          const confPct = row.audits > 0 ? ((row.conformes / row.audits) * 100).toFixed(0) : "0";
+          const avgT = row.durCnt > 0 ? formatMinutesHuman(row.durSum / row.durCnt) : "—";
+          return `
+            <tr>
+              <td class="p-2">
+                <div class="text-[10px] font-extrabold uppercase text-corp-600">${escapeHtml(row.cliente)}</div>
+                <div class="font-bold text-slate-800">${escapeHtml(row.subcliente)}</div>
+              </td>
+              <td class="p-2 text-right font-extrabold text-corp-900">${row.audits}</td>
+              <td class="p-2 text-right font-semibold">${row.unidades}</td>
+              <td class="p-2 text-right">
+                <span class="px-1.5 py-0.5 rounded text-[10px] font-bold ${Number(confPct) >= 90 ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}">${confPct}%</span>
+              </td>
+              <td class="p-2 text-right text-slate-600 font-semibold">${avgT}</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      // 4. Tabla Transportistas
+      const trBody = document.getElementById("kpi-transp-body");
+      if (kpi.byTransp.length === 0) {
+        trBody.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-slate-400">Sin datos.</td></tr>`;
+      } else {
+        trBody.innerHTML = kpi.byTransp.map(t => {
+          const cPct = t.audits > 0 ? ((t.conformes / t.audits) * 100).toFixed(0) : "0";
+          return `
+            <tr>
+              <td class="p-2">
+                <div class="font-bold text-slate-800 truncate max-w-[165px]">${escapeHtml(t.transportista)}</div>
+                ${t.violados > 0 ? `<span class="text-[10px] text-red-600 font-bold">${t.violados} precinto(s) violado(s)</span>` : ""}
+              </td>
+              <td class="p-2 text-right font-extrabold text-corp-900">${t.audits}</td>
+              <td class="p-2 text-right font-bold text-emerald-700">${cPct}%</td>
+            </tr>
+          `;
+        }).join("");
+      }
+
+      // 5. Tabla Top SKUs con Incidencias
+      const skuBody = document.getElementById("kpi-skus-body");
+      if (kpi.topSkus.length === 0) {
+        skuBody.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-emerald-600 font-semibold">0 desviaciones de inventario</td></tr>`;
+      } else {
+        skuBody.innerHTML = kpi.topSkus.slice(0, 15).map(s => `
+          <tr>
+            <td class="p-2">
+              <div class="font-extrabold text-corp-900">${escapeHtml(s.sku)}</div>
+              <div class="text-[10px] text-slate-500 truncate max-w-[175px]">${escapeHtml(s.desc)}</div>
+            </td>
+            <td class="p-2 text-right font-extrabold text-red-600">${s.absDiff} unid</td>
+          </tr>
+        `).join("");
+      }
+    };
+
+    function renderKpiCharts(kpi, temporalSeries) {
+      if (typeof Chart === "undefined") return;
+
+      // Chart 1: Temporal (Barras Auditorías + Línea Tiempo Promedio)
+      const ctxTemp = document.getElementById("chart-temporal");
+      if (ctxTemp) {
+        if (chartInstances.temporal) chartInstances.temporal.destroy();
+        const labels = temporalSeries.map(s => s.key);
+        const auditCounts = temporalSeries.map(s => s.audits);
+        const avgMins = temporalSeries.map(s => s.durCnt > 0 ? Math.round(s.durSum / s.durCnt) : 0);
+
+        chartInstances.temporal = new Chart(ctxTemp, {
+          type: "bar",
+          data: {
+            labels,
+            datasets: [
+              {
+                label: "Auditorías",
+                data: auditCounts,
+                backgroundColor: "#1D4ED8",
+                borderRadius: 6,
+                yAxisID: "y"
+              },
+              {
+                label: "Tiempo Prom. (min)",
+                data: avgMins,
+                type: "line",
+                borderColor: "#F59E0B",
+                backgroundColor: "#F59E0B",
+                borderWidth: 2,
+                tension: 0.3,
+                yAxisID: "y1"
+              }
+            ]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+              legend: { position: "bottom", labels: { boxWidth: 12, font: { size: 11 } } }
+            },
+            scales: {
+              x: { ticks: { font: { size: 10 } } },
+              y: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } }, position: "left" },
+              y1: { beginAtZero: true, grid: { drawOnChartArea: false }, ticks: { font: { size: 10 } }, position: "right" }
+            }
+          }
+        });
+      }
+
+      // Chart 2: Dona Resultados
+      const ctxRes = document.getElementById("chart-resultados");
+      if (ctxRes) {
+        if (chartInstances.resultados) chartInstances.resultados.destroy();
+        chartInstances.resultados = new Chart(ctxRes, {
+          type: "doughnut",
+          data: {
+            labels: ["Conforme", "Con Obs.", "No Conforme"],
+            datasets: [{
+              data: [kpi.conformes, kpi.conObs, kpi.noConformes],
+              backgroundColor: ["#10B981", "#F59E0B", "#EF4444"],
+              borderWidth: 2,
+              borderColor: "#ffffff"
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: "60%",
+            plugins: {
+              legend: { position: "bottom", labels: { boxWidth: 10, font: { size: 10 } } }
+            }
+          }
+        });
+      }
+
+      // Chart 3: Barras Horizontales por Cliente
+      const ctxCli = document.getElementById("chart-clientes");
+      if (ctxCli) {
+        if (chartInstances.clientes) chartInstances.clientes.destroy();
+        chartInstances.clientes = new Chart(ctxCli, {
+          type: "bar",
+          data: {
+            labels: kpi.byCliente.map(c => c.cliente),
+            datasets: [{
+              label: "Auditorías",
+              data: kpi.byCliente.map(c => c.audits),
+              backgroundColor: ["#0F294A", "#1D4ED8", "#0284C7", "#0D9488"],
+              borderRadius: 6
+            }]
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+              x: { beginAtZero: true, ticks: { precision: 0, font: { size: 10 } } },
+              y: { ticks: { font: { size: 10 } } }
+            }
+          }
+        });
+      }
+    }
+
+    // Exportación Gerencial de KPIs a Excel (.xlsx con 5 hojas)
+    window.exportKpiReportExcel = function () {
+      if (typeof XLSX === "undefined") {
+        showToast("Librería Excel aún cargando.", "warning");
+        return;
+      }
+      const kpi = state.kpiComputedCache || computeKpiMetrics(getFilteredKpiAudits());
+      if (kpi.total === 0) {
+        showToast("No hay auditorías en el rango seleccionado para exportar.", "warning");
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+
+      // Hoja 1: Resumen Ejecutivo KPIs
+      const resumenRows = [
+        ["REPORTE EJECUTIVO DE INDICADORES - AUDITORÍA DE MERCADERÍA TRANSPORTADA"],
+        ["Fecha de generación", new Date().toLocaleString("es-PE")],
+        [],
+        ["INDICADOR LOGÍSTICO", "VALOR", "DETALLE"],
+        ["Total Auditorías Realizadas", kpi.total, `${kpi.avgAuditsPerDay.toFixed(2)} auditorías por día activo`],
+        ["Tiempo Promedio por Auditoría", kpi.durationCount > 0 ? formatMinutesHuman(kpi.avgDurationMins) : "Sin horario", `Tiempo total invertido: ${formatMinutesHuman(kpi.durationSum)}`],
+        ["Nivel de Conformidad (%)", `${kpi.conformidadPct.toFixed(2)}%`, `${kpi.conformes} Conformes / ${kpi.conObs} Con Obs. / ${kpi.noConformes} No Conformes`],
+        ["Exactitud de Inventario Auditado (IRA %)", `${kpi.iraPct.toFixed(2)}%`, `${kpi.totalVerif} unidades verificadas vs ${kpi.totalDecl} declaradas`],
+        ["Total Paletas Auditadas", kpi.totalPaletas, "Suma de paletas verificadas"],
+        ["Integridad de Precintos (%)", `${kpi.precintoPct.toFixed(2)}%`, `${kpi.precintoIntacto} intactos / ${kpi.precintoViolado} violados`],
+        ["Tasa de Incidencias en Cantidad (%)", `${kpi.incidenciaPct.toFixed(2)}%`, `${kpi.auditsConDiferencia} auditorías con desviación (${kpi.totalAbsDiff} unid)`]
+      ];
+      const wsResumen = XLSX.utils.aoa_to_sheet(resumenRows);
+      wsResumen["!cols"] = [{ wch: 38 }, { wch: 22 }, { wch: 48 }];
+      XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen_KPIs");
+
+      // Hoja 2: Evolución Temporal (Día, Hora, Mes, Año)
+      const tempRows = [
+        ["DESGLOSE POR DÍA"],
+        ["Fecha", "Auditorías", "Unidades", "Paletas", "Tiempo Promedio (min)"],
+        ...kpi.byDay.map(d => [d.key, d.audits, d.unidades, d.paletas, d.durCnt > 0 ? Math.round(d.durSum / d.durCnt) : 0]),
+        [],
+        ["DESGLOSE POR HORA DEL DÍA"],
+        ["Franja Horaria", "Auditorías", "Unidades", "Paletas", "Tiempo Promedio (min)"],
+        ...kpi.byHour.map(h => [h.key, h.audits, h.unidades, h.paletas, h.durCnt > 0 ? Math.round(h.durSum / h.durCnt) : 0]),
+        [],
+        ["DESGLOSE POR MES"],
+        ["Mes", "Auditorías", "Unidades", "Paletas", "Tiempo Promedio (min)"],
+        ...kpi.byMonth.map(m => [m.key, m.audits, m.unidades, m.paletas, m.durCnt > 0 ? Math.round(m.durSum / m.durCnt) : 0]),
+        [],
+        ["DESGLOSE POR AÑO"],
+        ["Año", "Auditorías", "Unidades", "Paletas", "Tiempo Promedio (min)"],
+        ...kpi.byYear.map(y => [y.key, y.audits, y.unidades, y.paletas, y.durCnt > 0 ? Math.round(y.durSum / y.durCnt) : 0])
+      ];
+      const wsTemp = XLSX.utils.aoa_to_sheet(tempRows);
+      wsTemp["!cols"] = [{ wch: 22 }, { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 24 }];
+      XLSX.utils.book_append_sheet(wb, wsTemp, "Dia_Hora_Mes_Anio");
+
+      // Hoja 3: Cliente y Sub-Cliente
+      const cliRows = [
+        ["DESGLOSE POR CLIENTE Y SUB-CLIENTE"],
+        ["Cliente", "Sub-Cliente", "Auditorías", "Unidades", "Paletas", "Conformes", "% Conformidad", "Tiempo Prom. (min)"],
+        ...kpi.byClienteSub.map(c => [
+          c.cliente,
+          c.subcliente,
+          c.audits,
+          c.unidades,
+          c.paletas,
+          c.conformes,
+          c.audits > 0 ? `${((c.conformes / c.audits) * 100).toFixed(1)}%` : "0%",
+          c.durCnt > 0 ? Math.round(c.durSum / c.durCnt) : 0
+        ])
+      ];
+      const wsCli = XLSX.utils.aoa_to_sheet(cliRows);
+      wsCli["!cols"] = [{ wch: 22 }, { wch: 36 }, { wch: 12 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 16 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, wsCli, "Cliente_SubCliente");
+
+      // Hoja 4: Transportistas y Top SKUs
+      const trRows = [
+        ["DESEMPEÑO POR TRANSPORTISTA"],
+        ["Transportista", "Auditorías", "Unidades", "Conformes", "% Conformidad", "Precintos Violados"],
+        ...kpi.byTransp.map(t => [
+          t.transportista,
+          t.audits,
+          t.unidades,
+          t.conformes,
+          t.audits > 0 ? `${((t.conformes / t.audits) * 100).toFixed(1)}%` : "0%",
+          t.violados
+        ]),
+        [],
+        ["TOP SKUs CON DESVIACIÓN"],
+        ["SKU", "Descripción", "Desviación Absoluta (unid)", "Diferencia Neta", "Ocurrencias"],
+        ...kpi.topSkus.map(s => [s.sku, s.desc, s.absDiff, s.netDiff, s.count])
+      ];
+      const wsTr = XLSX.utils.aoa_to_sheet(trRows);
+      wsTr["!cols"] = [{ wch: 36 }, { wch: 38 }, { wch: 24 }, { wch: 16 }, { wch: 18 }, { wch: 18 }];
+      XLSX.utils.book_append_sheet(wb, wsTr, "Transportistas_SKUs");
+
+      // Hoja 5: Base de Datos Completa Filtrada
+      const baseRows = buildFlatAuditsRows(kpi.filteredAudits);
+      const wsBase = XLSX.utils.aoa_to_sheet(baseRows);
+      wsBase["!cols"] = Array(18).fill({ wch: 20 });
+      XLSX.utils.book_append_sheet(wb, wsBase, "Base_Datos");
+
+      const filename = `Reporte_KPI_Auditoria_${getTodayISO()}.xlsx`;
+      XLSX.writeFile(wb, filename);
+      showToast(`Reporte KPI ${filename} descargado.`, "success");
+    };
+
+    function buildFlatAuditsRows(auditsList) {
+      return [
+        [
+          "N° Auditoría", "Fecha", "Horario", "Duración (min)", "Cliente", "Sub-Cliente",
+          "Delivery", "Destino", "Lugar", "Transportista", "Placa", "Conductor",
+          "Precinto", "Estado Precinto", "Total Unidades", "Total Paletas", "Resultado",
+          "Observaciones Generales", "Registrado Por"
+        ],
+        ...auditsList.map(a => {
+          const tInfo = parseAuditTimeRange(a.hora_inicio_fin);
+          return [
+            a.numero_auditoria || "",
+            a.fecha_auditoria || "",
+            a.hora_inicio_fin || "",
+            tInfo.durationMinutes !== null ? tInfo.durationMinutes : "",
+            a.cliente || "",
+            a.sub_cliente || "",
+            a.delivery || "",
+            a.destino || "",
+            a.lugar_auditoria || "",
+            a.transportista || "",
+            a.placa || "",
+            a.conductor || "",
+            a.precinto || "",
+            a.estado_precinto || "",
+            a.total_unidades ?? 0,
+            a.total_paletas ?? 0,
+            a.resultado || "",
+            a.observaciones_generales || "",
+            a.creado_por || ""
+          ];
+        })
+      ];
+    }
+
+    function exportAuditsCollectionExcel(auditsList, filename) {
+      if (typeof XLSX === "undefined") {
+        showToast("Librería Excel aún cargando.", "warning");
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(buildFlatAuditsRows(auditsList));
+      ws["!cols"] = Array(19).fill({ wch: 20 });
+      XLSX.utils.book_append_sheet(wb, ws, "Auditorias");
+      XLSX.writeFile(wb, filename);
+      showToast(`Archivo ${filename} descargado.`, "success");
+    }
+
+    window.exportKpiDataCSV = function () {
+      const filtered = getFilteredKpiAudits();
+      if (filtered.length === 0) {
+        showToast("No hay datos filtrados para exportar.", "warning");
+        return;
+      }
+      const rows = buildFlatAuditsRows(filtered);
+      const csvContent = "\uFEFF" + rows.map(r =>
+        r.map(cell => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(",")
+      ).join("\n");
+
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `Base_Auditorias_${getTodayISO()}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      showToast("Archivo CSV descargado.", "success");
+    };
+
+    // =========================================================================
+    // 15. PESTAÑA 4: CATÁLOGO BD & IMPORTADOR EXCEL (.XLSX) HACIA SUPABASE
     // =========================================================================
     window.switchCatalogTab = function (tab) {
       state.catalogTab = tab;
@@ -2994,7 +4277,7 @@
       document.getElementById("cat-add-simple-fields").classList.toggle("hidden", isSku);
     };
 
-    window.saveNewCatalogItem = function () {
+    window.saveNewCatalogItem = async function () {
       if (state.catalogTab === "skus") {
         const sku = document.getElementById("new-sku-code").value.trim();
         const nc12 = document.getElementById("new-sku-12nc").value.trim();
@@ -3025,9 +4308,9 @@
       }
 
       toggleAddCatalogForm(false);
-      saveCatalogToLocalStorage();
       renderCatalogList();
-      showToast("Registro agregado al catálogo local BD.", "success");
+      const synced = await saveCatalogToSupabase();
+      if (synced) showToast("Catálogo BD actualizado en Supabase para todos los equipos.", "success");
     };
 
     window.renderCatalogList = function () {
@@ -3069,7 +4352,7 @@
       if (!file) return;
       const statusEl = document.getElementById("excel-import-status");
       statusEl.classList.remove("hidden");
-      statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Leyendo hoja BD del archivo Excel...`;
+      statusEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin mr-1.5"></i> Procesando archivo Excel y sincronizando con Supabase...`;
 
       try {
         const data = await file.arrayBuffer();
@@ -3149,13 +4432,14 @@
         state.catalog.transportistas = Array.from(transSet);
         state.catalog.destinos = Array.from(destSet);
 
-        saveCatalogToLocalStorage();
         populateClienteSelect();
         populateDestinoSelect();
         renderCatalogList();
 
-        statusEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i> ¡Importación completa desde hoja <strong>${escapeHtml(bdSheetName)}</strong>! Se cargaron <strong>${importedSkus.length} SKUs</strong>, ${state.catalog.subclientes.length} Sub-Clientes y ${state.catalog.transportistas.length} Transportistas.`;
-        showToast(`${importedSkus.length} SKUs cargados al catálogo BD.`, "success");
+        const uploadedToCloud = await saveCatalogToSupabase();
+
+        statusEl.innerHTML = `<i class="fa-solid fa-circle-check text-emerald-400 mr-1.5"></i> ¡Importación completa desde hoja <strong>${escapeHtml(bdSheetName)}</strong>! Se cargaron <strong>${importedSkus.length} SKUs</strong>, ${state.catalog.subclientes.length} Sub-Clientes y ${state.catalog.transportistas.length} Transportistas ${uploadedToCloud ? "(sincronizado en Supabase)" : "(guardado local)"}.`;
+        showToast(`${importedSkus.length} SKUs sincronizados en Supabase.`, "success");
       } catch (err) {
         console.error("Error importando Excel:", err);
         statusEl.innerHTML = `<i class="fa-solid fa-circle-exclamation text-red-400 mr-1.5"></i> Error al leer el archivo Excel. Verifica que sea un archivo .xlsx válido.`;
@@ -3166,7 +4450,7 @@
     };
 
     // =========================================================================
-    // 15. PESTAÑA 4: GESTIÓN DE USUARIOS EN SUPABASE (`usuarios_auditoria`)
+    // 16. PESTAÑA 5: GESTIÓN DE USUARIOS EN SUPABASE (`usuarios_auditoria`)
     // =========================================================================
     window.loadUsersFromSupabase = async function () {
       const listEl = document.getElementById("users-list");
@@ -3370,7 +4654,7 @@
     };
 
     // =========================================================================
-    // 16. INICIALIZACIÓN AL CARGAR LA PÁGINA
+    // 17. INICIALIZACIÓN AL CARGAR LA PÁGINA
     // =========================================================================
     function bootstrap() {
       loadCatalogFromLocalStorage();
@@ -3386,7 +4670,6 @@
 
       renderCatalogList();
 
-      // Verificar si hay sesión activa en sessionStorage para no volver a pedir clave al recargar
       try {
         const savedSession = sessionStorage.getItem(SESSION_USER_KEY);
         if (savedSession) {
